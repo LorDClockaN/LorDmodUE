@@ -63,10 +63,9 @@ struct scatterlist *videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
 	struct page *pg;
 	int i;
 
-	sglist = vmalloc(nr_pages * sizeof(*sglist));
+	sglist = vzalloc(nr_pages * sizeof(*sglist));
 	if (NULL == sglist)
 		return NULL;
-	memset(sglist, 0, nr_pages * sizeof(*sglist));
 	sg_init_table(sglist, nr_pages);
 	for (i = 0; i < nr_pages; i++, virt += PAGE_SIZE) {
 		pg = vmalloc_to_page(virt);
