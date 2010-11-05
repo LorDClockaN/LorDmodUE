@@ -593,7 +593,8 @@ msm_i2c_remove(struct platform_device *pdev)
 	iounmap(dev->base);
 	kfree(dev);
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, (mem->end - mem->start) + 1);
+	if (mem)
+		release_mem_region(mem->start, (mem->end - mem->start) + 1);
 	return 0;
 }
 
