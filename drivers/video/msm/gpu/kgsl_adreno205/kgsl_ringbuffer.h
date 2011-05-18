@@ -133,8 +133,8 @@ struct kgsl_rbwatchdog {
 
 #define GSL_RB_MEMPTRS_SCRATCH_COUNT	 8
 struct kgsl_rbmemptrs {
-	volatile int  rptr;
-	volatile int  wptr_poll;
+	int  rptr;
+	int  wptr_poll;
 };
 
 #define GSL_RB_MEMPTRS_RPTR_OFFSET \
