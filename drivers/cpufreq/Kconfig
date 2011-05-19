@@ -229,4 +229,12 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_VDD_LEVELS
+	bool "CPU Vdd levels sysfs interface"
+	depends on CPU_FREQ_STAT
+	depends on ARCH_MSM7X30
+	default n
+	help
+	  CPU Vdd levels sysfs interface
+
 endif	# CPU_FREQ
