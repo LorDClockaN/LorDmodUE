@@ -111,7 +111,7 @@ static void microp_led_jogball_brightness_set(struct led_classdev *led_cdev,
 	ldata->brightness = brightness;
 	spin_unlock_irqrestore(&ldata->brightness_lock, flags);
 
-	switch (brightness) {
+	switch ((int)brightness) {
 	case 0:
 		data[0] = 0;
 		break;
@@ -151,7 +151,7 @@ static void microp_led_sharekey_brightness_set(struct led_classdev *led_cdev,
 	ldata->brightness = brightness;
 	spin_unlock_irqrestore(&ldata->brightness_lock, flags);
 
-	switch (brightness) {
+	switch ((int)brightness) {
 	case 0:
 		printk(KERN_INFO "%s stop\n",__func__);
 		data[0] = 0;
