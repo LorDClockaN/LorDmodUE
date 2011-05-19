@@ -190,7 +190,7 @@ static void microp_led_wimax_brightness_set(struct led_classdev *led_cdev,
 	ldata->brightness = brightness;
 	spin_unlock_irqrestore(&ldata->brightness_lock, flags);
 
-	switch (brightness) {
+	switch ((int)brightness) {
 	case 0:
 		data[0] = 0;
 		break;
