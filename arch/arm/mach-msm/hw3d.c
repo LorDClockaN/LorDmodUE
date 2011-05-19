@@ -722,7 +722,7 @@ static int hw3d_resume(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init hw3d_probe(struct platform_device *pdev)
+static int hw3d_probe(struct platform_device *pdev)
 {
 	struct hw3d_info *info;
 #define DEV_MASTER MKDEV(MAJOR(info->devno), MINOR_MASTER)
