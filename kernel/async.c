@@ -280,7 +280,7 @@ EXPORT_SYMBOL_GPL(async_synchronize_full_domain);
 void async_synchronize_cookie_domain(async_cookie_t cookie,
 				     struct list_head *running)
 {
-	ktime_t calltime = { .tv64 = 0 }, delta, rettime;
+	ktime_t starttime = { .tv64 = 0 }, delta, endtime;
 
 	if (initcall_debug && system_state == SYSTEM_BOOTING) {
 		printk("async_waiting @ %i\n", task_pid_nr(current));
