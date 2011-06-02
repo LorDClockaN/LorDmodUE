@@ -103,13 +103,13 @@ static unsigned int max_ramp_down;
 /*
  * CPU freq will be increased if measured load > max_cpu_load;
  */
-#define DEFAULT_MAX_CPU_LOAD 80
+#define DEFAULT_MAX_CPU_LOAD 70
 static unsigned long max_cpu_load;
 
 /*
  * CPU freq will be decreased if measured load < min_cpu_load;
  */
-#define DEFAULT_MIN_CPU_LOAD 40
+#define DEFAULT_MIN_CPU_LOAD 35
 static unsigned long min_cpu_load;
 
 
@@ -314,7 +314,7 @@ static ssize_t store_down_rate_us(struct cpufreq_policy *policy, const char *buf
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input >= 1000 && input <= 100000000)
 	  down_rate_us = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr down_rate_us_attr = __ATTR(down_rate_us, 0644,
@@ -332,7 +332,7 @@ static ssize_t store_up_min_freq(struct cpufreq_policy *policy, const char *buf,
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input >= 0)
 	  up_min_freq = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr up_min_freq_attr = __ATTR(up_min_freq, 0644,
@@ -350,7 +350,7 @@ static ssize_t store_sleep_max_freq(struct cpufreq_policy *policy, const char *b
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input >= 0)
 	  sleep_max_freq = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr sleep_max_freq_attr = __ATTR(sleep_max_freq, 0644,
@@ -368,7 +368,7 @@ static ssize_t store_sample_rate_jiffies(struct cpufreq_policy *policy, const ch
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input > 0 && input <= 1000)
 	  sample_rate_jiffies = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr sample_rate_jiffies_attr = __ATTR(sample_rate_jiffies, 0644,
@@ -386,7 +386,7 @@ static ssize_t store_ramp_up_step(struct cpufreq_policy *policy, const char *buf
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0)
 	  ramp_up_step = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr ramp_up_step_attr = __ATTR(ramp_up_step, 0644,
@@ -404,7 +404,7 @@ static ssize_t store_max_ramp_down(struct cpufreq_policy *policy, const char *bu
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0)
 	  max_ramp_down = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr max_ramp_down_attr = __ATTR(max_ramp_down, 0644,
@@ -422,7 +422,7 @@ static ssize_t store_max_cpu_load(struct cpufreq_policy *policy, const char *buf
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input > 0 && input <= 100)
 	  max_cpu_load = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr max_cpu_load_attr = __ATTR(max_cpu_load, 0644,
@@ -440,7 +440,7 @@ static ssize_t store_min_cpu_load(struct cpufreq_policy *policy, const char *buf
 	res = strict_strtoul(buf, 0, &input);
 	if (res >= 0 && input > 0 && input < 100)
 	  min_cpu_load = input;
-	return res;
+	return count;
 }
 
 static struct freq_attr min_cpu_load_attr = __ATTR(min_cpu_load, 0644,
