@@ -226,7 +226,7 @@ static unsigned int spade_wifi_status(struct device *dev)
 }
 
 static struct mmc_platform_data spade_wifi_data = {
-	.ocr_mask		= MMC_VDD_28_29,
+	.ocr_mask		= MMC_VDD_20_21,
 	.status			= spade_wifi_status,
 	.register_status_notify	= spade_wifi_status_register,
 	.embedded_sdio		= &spade_wifi_emb_data,
