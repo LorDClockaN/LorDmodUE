@@ -716,7 +716,6 @@ static int slow_work_thread(void *_data)
 	DEFINE_WAIT(wait);
 
 	set_freezable();
-	set_user_nice(current, -5);
 
 	/* allocate ourselves an ID */
 	spin_lock_irq(&slow_work_queue_lock);

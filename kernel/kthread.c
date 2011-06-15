@@ -167,7 +167,9 @@ void kthread_bind(struct task_struct *p, unsigned int cpu)
 	}
 
 	p->cpus_allowed = cpumask_of_cpu(cpu);
+#ifndef CONFIG_SCHED_BFS
 	p->rt.nr_cpus_allowed = 1;
+#endif
 	p->flags |= PF_THREAD_BOUND;
 }
 EXPORT_SYMBOL(kthread_bind);

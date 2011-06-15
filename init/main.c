@@ -834,6 +834,7 @@ static noinline int init_post(void)
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
+	print_scheduler_version();
 
 	current->signal->flags |= SIGNAL_UNKILLABLE;
 
