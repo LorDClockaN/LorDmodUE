@@ -2814,7 +2814,7 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 	err = ext4_handle_dirty_metadata(handle, NULL, gdp_bh);
 
 out_err:
-	sb->s_dirt = 1;
+	ext4_mark_super_dirty(sb);
 	brelse(bitmap_bh);
 	return err;
 }
@@ -4682,7 +4682,7 @@ do_more:
 		put_bh(bitmap_bh);
 		goto do_more;
 	}
-	sb->s_dirt = 1;
+	ext4_mark_super_dirty(sb);
 error_return:
 	if (freed)
 		dquot_free_block(inode, freed);
