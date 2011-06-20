@@ -116,7 +116,7 @@ static unsigned long min_cpu_load;
 static int cpufreq_governor_smartass2(struct cpufreq_policy *policy,
 		unsigned int event);
 
-#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS
+#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS2
 static
 #endif
 struct cpufreq_governor cpufreq_gov_smartass2 = {
@@ -220,13 +220,13 @@ static unsigned int cpufreq_smartass2_calc_freq(unsigned int cpu, struct cpufreq
 	delta_time = (unsigned int)( current_wall_time - freq_change_time );
 
 	cpu_load = 100 * (delta_time - idle_time) / delta_time;
-	//printk(KERN_INFO "Smartass calc_freq: delta_time=%u cpu_load=%u\n",delta_time,cpu_load);
+	//printk(KERN_INFO "Smartass2 calc_freq: delta_time=%u cpu_load=%u\n",delta_time,cpu_load);
 	if (cpu_load < min_cpu_load) {
 		cpu_load += 100 - max_cpu_load; // dummy load.
 		new_freq = policy->cur * cpu_load / 100;
 		if (max_ramp_down && new_freq < policy->cur - max_ramp_down)
 			new_freq = policy->cur - max_ramp_down;
-		//printk(KERN_INFO "Smartass calc_freq: %u => %u\n",policy->cur,new_freq);
+		//printk(KERN_INFO "Smartass2 calc_freq: %u => %u\n",policy->cur,new_freq);
 		return new_freq;
 	} if (cpu_load > max_cpu_load) {
 		if (ramp_up_step)
@@ -605,7 +605,7 @@ static int __init cpufreq_smartass2_init(void)
 	return cpufreq_register_governor(&cpufreq_gov_smartass2);
 }
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS
+#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS2
 pure_initcall(cpufreq_smartass2_init);
 #else
 module_init(cpufreq_smartass2_init);
