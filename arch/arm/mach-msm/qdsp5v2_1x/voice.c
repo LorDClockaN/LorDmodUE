@@ -114,9 +114,9 @@ static struct q5v2_hw_info def_audio_hw[Q5V2_HW_COUNT] = {
 		.min_gain[VOC_WB_INDEX] = -1100,
 	},
 	[Q5V2_HW_SPEAKER] = {
-		.max_gain[VOC_NB_INDEX] = 1200,
+		.max_gain[VOC_NB_INDEX] = 1220,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1200,
+		.max_gain[VOC_WB_INDEX] = 1220,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 	[Q5V2_HW_BT_SCO] = {
