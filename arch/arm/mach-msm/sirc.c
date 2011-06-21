@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-msm/irq.c
  *
- * Copyright (c) 2009 QUALCOMM Incorporated.
+ * Copyright (c) 2009-2010 Code Aurora Forum, All rights reserved.
  * Copyright (C) 2009 Google, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -151,6 +151,12 @@ static void sirc_irq_handler(unsigned int irq, struct irq_desc *desc)
 	while ((reg < ARRAY_SIZE(sirc_reg_table)) &&
 		(sirc_reg_table[reg].cascade_irq != irq))
 		reg++;
+
+	if (reg == ARRAY_SIZE(sirc_reg_table)) {
+		printk(KERN_ERR "%s: incorrect irq %d called\n",
+			__func__, irq);
+		return;
+	}
 
 	status = readl(sirc_reg_table[reg].int_status);
 	status &= SIRC_MASK;
