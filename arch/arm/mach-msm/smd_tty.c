@@ -28,6 +28,7 @@
 #include <mach/msm_smd.h>
 
 #define MAX_SMD_TTYS 32
+#define MAX_TTY_BUF_SIZE 2048
 
 static DEFINE_MUTEX(smd_tty_lock);
 
@@ -70,6 +71,9 @@ static void smd_tty_work_func(struct work_struct *work)
 		avail = smd_read_avail(info->ch);
 		if (avail == 0)
 			break;
+
+		if (avail > MAX_TTY_BUF_SIZE)
+			avail = MAX_TTY_BUF_SIZE;
 
 		ptr = NULL;
 		avail = tty_prepare_flip_string(tty, &ptr, avail);
