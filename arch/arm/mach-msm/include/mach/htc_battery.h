@@ -16,7 +16,7 @@
 #include <linux/notifier.h>
 #include <linux/power_supply.h>
 
-#if CONFIG_TPS65200_VIVO
+/*#if CONFIG_TPS65200_VIVO
 #define BATT_EVENT_SUSPEND	0x01
 #define ENABLE_LIMITED_CHG	0x10
 #define CLEAR_LIMITED_CHG	0x11
@@ -29,6 +29,7 @@
 #define CHECK_INT1		0XCA
 #define CHECK_CONTROL		0xCB
 #endif
+*/
 
 /* information about the system we're running on */
 extern unsigned int system_rev;
