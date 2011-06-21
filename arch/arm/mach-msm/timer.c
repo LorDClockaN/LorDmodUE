@@ -607,7 +607,7 @@ static struct msm_clock msm_clocks[] = {
 		.regbase = MSM_DGT_BASE,
 		.freq = DGT_HZ >> MSM_DGT_SHIFT,
 		.shift = MSM_DGT_SHIFT,
-		.write_delay = 2,
+		.write_delay = 9,
 	}
 };
 
