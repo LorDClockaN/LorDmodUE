@@ -255,7 +255,6 @@ static int menu_select(struct cpuidle_device *dev)
 	data->expected_us =
 		t.tv_sec * USEC_PER_SEC + t.tv_nsec / NSEC_PER_USEC;
 
-
 	data->bucket = which_bucket(data->expected_us);
 
 	multiplier = performance_multiplier();
