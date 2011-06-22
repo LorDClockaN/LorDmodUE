@@ -85,12 +85,12 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS
 	help
 	  Use the CPUFreq governor 'smartass' as default.
 
-config CPU_FREQ_DEFAULT_GOV_SMARTASS2
-	bool "smartass2"
-	select CPU_FREQ_GOV_SMARTASS2
+config CPU_FREQ_DEFAULT_GOV_BRAZILIANWAX
+	bool "brazilianwax"
+	select CPU_FREQ_GOV_BRAZILIANWAX
 	select CPU_FREQ_GOV_PERFORMANCE
 	help
-	  Use the CPUFreq governor 'smartass2' as default.
+	  Use the CPUFreq governor 'brazilianwax' as default.
 
 config CPU_FREQ_DEFAULT_GOV_USERSPACE
 	bool "userspace"
@@ -155,11 +155,11 @@ config CPU_FREQ_GOV_SMARTASS
 
           If in doubt, say Y.
 
-config CPU_FREQ_GOV_SMARTASS2
-	tristate "'smartass2' cpufreq governor"
+config CPU_FREQ_GOV_BRAZILIANWAX
+	tristate "'brazilianwax' cpufreq governor"
 	depends on CPU_FREQ
 	help
-          smartass2' - a "slightly more agressive smart" optimized governor!
+          brazilianwax' - a "slightly more agressive smart" optimized governor!
  
 	  If in doubt, say Y.
 
