@@ -835,15 +835,27 @@ static u32 ddl_get_dec_property
 	switch (property_hdr->prop_id) {
 	case VCD_I_FRAME_SIZE:
 		{
+			struct vcd_property_frame_size *fz_size;
 			if (sizeof(struct vcd_property_frame_size) ==
 			    property_hdr->sz) {
 					ddl_calculate_stride(
 					&decoder->client_frame_size,
 					!decoder->progressive_only,
 					decoder->codec.codec);
+					if (decoder->buf_format.buffer_format
+                                                == VCD_BUFFER_FORMAT_TILE_4x2) {
+                                                fz_size =
+                                                &decoder->client_frame_size;
+                                                fz_size->stride =
+                                                DDL_TILE_ALIGN(fz_size->width,
+                                                        DDL_TILE_ALIGN_WIDTH);
+                                                fz_size->scan_lines =
+                                                DDL_TILE_ALIGN(fz_size->height,
+                                                        DDL_TILE_ALIGN_HEIGHT);
+                                        }
 					*(struct vcd_property_frame_size *)
-					    property_value =
-					    decoder->client_frame_size;
+					    	property_value =
+					    	decoder->client_frame_size;
 					vcd_status = VCD_S_SUCCESS;
 			}
 			break;
