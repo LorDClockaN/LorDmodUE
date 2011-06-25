@@ -943,11 +943,7 @@ int generic_file_fsync(struct file *file, int datasync)
 	int ret;
 
 	ret = sync_mapping_buffers(inode->i_mapping);
-	if (!(inode->i_state & I_DIRTY))
-		return ret;
-	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
-		return ret;
-
+	
 	err = sync_inode(inode, &wbc);
 	if (ret == 0)
 		ret = err;
