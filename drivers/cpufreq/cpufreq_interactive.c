@@ -52,7 +52,7 @@ static cpumask_t work_cpumask;
 static unsigned int suspended = 0;
 static unsigned int enabled = 0;
 
-static unsigned int suspendfreq = 400000;
+static unsigned int suspendfreq = 384000;
 
 static unsigned int samples = 0;
 
