@@ -1,0 +1,22 @@
+Savaged-Zen Battery Options sysfs interface
+-------------------------------------------
+What is it?
+-----------
+- An overcomplicated sysfs interface that allows the switching between SBC
+and non-SBC in the HTC battery driver.
+- It's overcomplicated for a reason, because implementing more variables to
+it in the future (IE if we want to change kernel tunables through sysfs) -
+it will be extremely simple to implement.
+
+Usage
+-----
+int sysctl_batt_sbc - range from 0 to 1. 0 turns SBC off, 1 turns SBC on
+SBC is disabled by default unless CONFIG_HTC_BATTCHG_SBC_DEFAULT is set.
+
+changing at runtime:
+echo 1 > /sys/kernel/batt_options/sbc/sysctl_batt_sbc (turn it on)
+echo 0 > /sys/kernel/batt_options/sbc/sysctl_batt_sbc (turn it off)
+
+Author: Brandon Berhent
+- Zen Kernel developer and Savaged-Zen kernel developer
+
