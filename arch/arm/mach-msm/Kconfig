@@ -716,14 +716,6 @@ config HTC_BATT8x60
 	default n
 	bool "HTC battery driver for 8x60"
 
-config HTC_BATTCHG_SBC_DEFAULT
-	depends on HTC_BATTCHG
-	default y
-	bool "Use SBC trickle charging by default"
-	help
-	  This enables the SBC (Superior Battery Charging) by ms79723
-	  It can be enabled/disabled at runtime at /sys/kernel/batt_options/sbc
-
 config HTC_BATTCHG_SMEM
 	depends on HTC_BATTCHG
 	default n
