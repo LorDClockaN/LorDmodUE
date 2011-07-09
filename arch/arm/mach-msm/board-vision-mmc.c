@@ -224,7 +224,7 @@ static unsigned int vision_wifi_status(struct device *dev)
 }
 
 static struct mmc_platform_data vision_wifi_data = {
-	.ocr_mask		= MMC_VDD_28_29,
+	.ocr_mask		= MMC_VDD_20_21,
 	.status			= vision_wifi_status,
 	.register_status_notify	= vision_wifi_status_register,
 	.embedded_sdio		= &vision_wifi_emb_data,
