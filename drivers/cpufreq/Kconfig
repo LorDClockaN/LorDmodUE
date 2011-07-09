@@ -111,6 +111,22 @@ config CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the performance governor.
 
+config CPU_FREQ_DEFAULT_GOV_MINMAX
+  bool "minmax"
+  select CPU_FREQ_GOV_MINMAX
+  select CPU_FREQ_GOV_PERFORMANCE
+  help
+    Use the CPUFreq governor 'minmax' as default. This minimizes the
+    frequency jumps does by the governor. This is aimed at maximizing
+    both perfomance and battery life.
+
+config CPU_FREQ_DEFAULT_GOV_SMARTASS
+  bool "smartass"
+  select CPU_FREQ_GOV_SMARTASS
+  select CPU_FREQ_GOV_PERFORMANCE
+  help
+    Use the CPUFreq governor 'smartass' as default.
+
 config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	bool "interactive"
 	select CPU_FREQ_GOV_INTERACTIVE
@@ -205,5 +221,36 @@ config CPU_FREQ_GOV_CONSERVATIVE
 	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_MINMAX
+  tristate "'minmax' cpufreq governor"
+  depends on CPU_FREQ
+  help
+    'minmax' - this driver tries to minimize the frequency jumps by limiting
+    the the selected frequencies to either the min or the max frequency of
+    the policy. The frequency is selected according to the load.
+
+    If in doubt, say N.
+
+config CPU_FREQ_GOV_SMARTASS
+  tristate "'smartass' cpufreq governor"
+  depends on CPU_FREQ
+  help
+    'smartass' - a "smart" optimized governor for the hero!
+
+    If in doubt, say N.
+
+config CPU_FREQ_MIN_TICKS
+  int "Ticks between governor polling interval."
+  default 10
+  help
+    Minimum number of ticks between polling interval for governors.
+
+config CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER
+  int "Sampling rate multiplier for governors."
+  default 1000
+  help
+    Sampling latency rate multiplied by the cpu switch latency.
+    Affects governor polling.
 
 endif	# CPU_FREQ

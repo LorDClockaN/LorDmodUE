@@ -1366,8 +1366,6 @@ config MSM_CPU_FREQ_SCREEN_ON
 
 endif # MSM_CPU_FREQ_SCREEN
 
-if PERFLOCK
-
 config MSM_CPU_FREQ_ONDEMAND_MAX
 	int "Max"
 	default 384000
@@ -1376,7 +1374,6 @@ config MSM_CPU_FREQ_ONDEMAND_MIN
 	int "Min"
 	default 245760
 
-endif # PERFLOCK
 
 config MSM_HW3D
 	tristate "MSM Hardware 3D Register Driver"
