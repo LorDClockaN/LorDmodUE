@@ -31,25 +31,25 @@ static struct mutex bt_sco_lock;
 
 static struct q5v2_hw_info q5v2_audio_hw[Q5V2_HW_COUNT] = {
 	[Q5V2_HW_HANDSET] = {
-		.max_gain[VOC_NB_INDEX] = 400,
+		.max_gain[VOC_NB_INDEX] = 500,
 		.min_gain[VOC_NB_INDEX] = -1600,
-		.max_gain[VOC_WB_INDEX] = 400,
+		.max_gain[VOC_WB_INDEX] = 500,
 		.min_gain[VOC_WB_INDEX] = -1600,
 	},
 	[Q5V2_HW_HEADSET] = {
-		.max_gain[VOC_NB_INDEX] = 900,
+		.max_gain[VOC_NB_INDEX] = 1125,
 		.min_gain[VOC_NB_INDEX] = -1100,
-		.max_gain[VOC_WB_INDEX] = 900,
+		.max_gain[VOC_WB_INDEX] = 1125,
 		.min_gain[VOC_WB_INDEX] = -1100,
 	},
 	[Q5V2_HW_SPEAKER] = {
-		.max_gain[VOC_NB_INDEX] = 1000,
+		.max_gain[VOC_NB_INDEX] = 1250,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1000,
+		.max_gain[VOC_WB_INDEX] = 1250,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 	[Q5V2_HW_BT_SCO] = {
-		.max_gain[VOC_NB_INDEX] = 600,
+		.max_gain[VOC_NB_INDEX] = 750,
 		.min_gain[VOC_NB_INDEX] = -900,
 		.max_gain[VOC_WB_INDEX] = 0,
 		.min_gain[VOC_WB_INDEX] = -1500,
@@ -67,15 +67,15 @@ static struct q5v2_hw_info q5v2_audio_hw[Q5V2_HW_COUNT] = {
 		.min_gain[VOC_WB_INDEX] = -2000,
 	},
 	[Q5V2_HW_USB_HS] = {
-		.max_gain[VOC_NB_INDEX] = 1000,
+		.max_gain[VOC_NB_INDEX] = 1250,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1000,
+		.max_gain[VOC_WB_INDEX] = 1250,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 	[Q5V2_HW_HAC] = {
-		.max_gain[VOC_NB_INDEX] = 1000,
+		.max_gain[VOC_NB_INDEX] = 1250,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1000,
+		.max_gain[VOC_WB_INDEX] = 1250,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 };

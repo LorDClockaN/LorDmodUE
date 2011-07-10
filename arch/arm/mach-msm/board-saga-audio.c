@@ -43,26 +43,26 @@ static atomic_t aic3254_ctl = ATOMIC_INIT(0);
 
 static struct q5v2_hw_info q5v2_audio_hw[Q5V2_HW_COUNT] = {
 	[Q5V2_HW_HANDSET] = {
-		.max_gain[VOC_NB_INDEX] = 200,
-		.min_gain[VOC_NB_INDEX] = -1400,
-		.max_gain[VOC_WB_INDEX] = -200,
-		.min_gain[VOC_WB_INDEX] = -1800,
-	},
-	[Q5V2_HW_HEADSET] = {
-		.max_gain[VOC_NB_INDEX] = 400,
+		.max_gain[VOC_NB_INDEX] = 500,
 		.min_gain[VOC_NB_INDEX] = -1600,
-		.max_gain[VOC_WB_INDEX] = 200,
-		.min_gain[VOC_WB_INDEX] = -1800,
-	},
-	[Q5V2_HW_SPEAKER] = {
-		.max_gain[VOC_NB_INDEX] = -100,
-		.min_gain[VOC_NB_INDEX] = -1600,
-		.max_gain[VOC_WB_INDEX] = -100,
+		.max_gain[VOC_WB_INDEX] = 500,
 		.min_gain[VOC_WB_INDEX] = -1600,
 	},
+	[Q5V2_HW_HEADSET] = {
+		.max_gain[VOC_NB_INDEX] = 1125,
+		.min_gain[VOC_NB_INDEX] = -1100,
+		.max_gain[VOC_WB_INDEX] = 1125,
+		.min_gain[VOC_WB_INDEX] = -1100,
+	},
+	[Q5V2_HW_SPEAKER] = {
+		.max_gain[VOC_NB_INDEX] = 1250,
+		.min_gain[VOC_NB_INDEX] = -500,
+		.max_gain[VOC_WB_INDEX] = 1250,
+		.min_gain[VOC_WB_INDEX] = -500,
+	},
 	[Q5V2_HW_BT_SCO] = {
-		.max_gain[VOC_NB_INDEX] = 0,
-		.min_gain[VOC_NB_INDEX] = -1500,
+		.max_gain[VOC_NB_INDEX] = 750,
+		.min_gain[VOC_NB_INDEX] = -900,
 		.max_gain[VOC_WB_INDEX] = 0,
 		.min_gain[VOC_WB_INDEX] = -1500,
 	},
@@ -79,15 +79,15 @@ static struct q5v2_hw_info q5v2_audio_hw[Q5V2_HW_COUNT] = {
 		.min_gain[VOC_WB_INDEX] = -2000,
 	},
 	[Q5V2_HW_USB_HS] = {
-		.max_gain[VOC_NB_INDEX] = 1000,
+		.max_gain[VOC_NB_INDEX] = 1250,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1000,
+		.max_gain[VOC_WB_INDEX] = 1250,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 	[Q5V2_HW_HAC] = {
-		.max_gain[VOC_NB_INDEX] = 1000,
+		.max_gain[VOC_NB_INDEX] = 1250,
 		.min_gain[VOC_NB_INDEX] = -500,
-		.max_gain[VOC_WB_INDEX] = 1000,
+		.max_gain[VOC_WB_INDEX] = 1250,
 		.min_gain[VOC_WB_INDEX] = -500,
 	},
 };
