@@ -15,7 +15,6 @@
 #include <linux/err.h>
 #include <linux/ioctl.h>
 #include <linux/init.h>
-#include <linux/mtd/compatmac.h>
 #include <linux/proc_fs.h>
 
 #include <linux/mtd/mtd.h>
