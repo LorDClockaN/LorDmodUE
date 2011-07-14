@@ -19,13 +19,13 @@ Original Auther:
 
 static void poweralg_config_init(struct poweralg_config_type *config)
 {
-	config->full_charging_mv = 4110;
+	config->full_charging_mv = 4170;
 	config->full_charging_ma = 50;
 	config->full_pending_ma = 0;	/* disabled*/
-	config->full_charging_timeout_sec = 60 * 60;
-	config->voltage_recharge_mv = 4150;
+	config->full_charging_timeout_sec = 60 * 180;
+	config->voltage_recharge_mv = 4210;
 	config->capacity_recharge_p = 0;
-	config->voltage_exit_full_mv = 4100;
+	config->voltage_exit_full_mv = 4160;
 	config->min_taper_current_mv = 0; /* disabled */
 	config->min_taper_current_ma = 0; /* disabled */
 	config->wait_votlage_statble_sec = 1 * 60;
