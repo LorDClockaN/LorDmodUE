@@ -793,7 +793,7 @@ static int __init cpufreq_brazilianwax_init(void)
         }
 
         /* Scale up is high priority */
-        up_wq = create_rt_workqueue("kbrazilianwax_up");
+        up_wq = alloc_workqueue("kbrazilianwax_up", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
         down_wq = create_workqueue("kbrazilianwax_down");
 
         INIT_WORK(&freq_scale_work, cpufreq_brazilianwax_freq_change_time_work);
@@ -820,5 +820,5 @@ static void __exit cpufreq_brazilianwax_exit(void)
 module_exit(cpufreq_brazilianwax_exit);
 
 MODULE_AUTHOR ("Erasmux/imoseyon");
-MODULE_DESCRIPTION ("'cpufreq_brazilianwax' - A smart cpufreq governor optimized for the hero!");
+MODULE_DESCRIPTION ("'cpufreq_brazilianwax' - A smart cpufreq governor optimized for the DHD!");
 MODULE_LICENSE ("GPL");

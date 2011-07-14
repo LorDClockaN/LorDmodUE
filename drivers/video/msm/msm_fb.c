@@ -1262,7 +1262,7 @@ static int msmfb_probe(struct platform_device *pdev)
 	spin_lock_init(&msmfb->update_lock);
 	mutex_init(&msmfb->panel_init_lock);
 	init_waitqueue_head(&msmfb->frame_wq);
-	msmfb->resume_workqueue = create_rt_workqueue("panel_on");
+	msmfb->resume_workqueue = alloc_workqueue("panel_on", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
 	if (msmfb->resume_workqueue == NULL) {
 		PR_DISP_ERR("failed to create panel_on workqueue\n");
 		ret = -ENOMEM;
