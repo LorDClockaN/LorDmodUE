@@ -62,6 +62,7 @@ struct hci_conn_hash {
 	unsigned int     sco_num;
 };
 
+#define NUM_REASSEMBLY 4
 struct hci_dev {
 	struct list_head list;
 	spinlock_t	lock;
@@ -433,6 +434,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb);
 
 int hci_recv_frame(struct sk_buff *skb);
 int hci_recv_fragment(struct hci_dev *hdev, int type, void *data, int count);
+int hci_recv_stream_fragment(struct hci_dev *hdev, void *data, int count);
 
 int hci_register_sysfs(struct hci_dev *hdev);
 void hci_unregister_sysfs(struct hci_dev *hdev);

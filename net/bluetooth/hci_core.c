@@ -1030,6 +1030,115 @@ int hci_recv_frame(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(hci_recv_frame);
 
+static int hci_reassembly(struct hci_dev *hdev, int type, void *data,
+                                                  int count, __u8 index)
+{
+        int len = 0;
+        int hlen = 0;
+        int remain = count;
+        struct sk_buff *skb;
+        struct bt_skb_cb *scb;
+
+        if ((type < HCI_ACLDATA_PKT || type > HCI_EVENT_PKT) ||
+                                index >= NUM_REASSEMBLY)
+                return -EILSEQ;
+
+        skb = hdev->reassembly[index];
+
+        if (!skb) {
+                switch (type) {
+                case HCI_ACLDATA_PKT:
+                        len = HCI_MAX_FRAME_SIZE;
+                        hlen = HCI_ACL_HDR_SIZE;
+                        break;
+                case HCI_EVENT_PKT:
+                        len = HCI_MAX_EVENT_SIZE;
+                        hlen = HCI_EVENT_HDR_SIZE;
+                        break;
+                case HCI_SCODATA_PKT:
+                        len = HCI_MAX_SCO_SIZE;
+                        hlen = HCI_SCO_HDR_SIZE;
+                        break;
+                }
+
+                skb = bt_skb_alloc(len, GFP_ATOMIC);
+                if (!skb)
+                        return -ENOMEM;
+
+                scb = (void *) skb->cb;
+                scb->expect = hlen;
+                scb->pkt_type = type;
+
+                skb->dev = (void *) hdev;
+                hdev->reassembly[index] = skb;
+        }
+
+        while (count) {
+                scb = (void *) skb->cb;
+                len = min(scb->expect, (__u16)count);
+
+                memcpy(skb_put(skb, len), data, len);
+
+                count -= len;
+                data += len;
+                scb->expect -= len;
+                remain = count;
+
+                switch (type) {
+                case HCI_EVENT_PKT:
+                        if (skb->len == HCI_EVENT_HDR_SIZE) {
+                                struct hci_event_hdr *h = hci_event_hdr(skb);
+                                scb->expect = h->plen;
+
+                                if (skb_tailroom(skb) < scb->expect) {
+                                        kfree_skb(skb);
+                                        hdev->reassembly[index] = NULL;
+                                        return -ENOMEM;
+                                }
+                        }
+                        break;
+
+                case HCI_ACLDATA_PKT:
+                        if (skb->len  == HCI_ACL_HDR_SIZE) {
+                                struct hci_acl_hdr *h = hci_acl_hdr(skb);
+                                scb->expect = __le16_to_cpu(h->dlen);
+
+                                if (skb_tailroom(skb) < scb->expect) {
+                                        kfree_skb(skb);
+                                        hdev->reassembly[index] = NULL;
+                                        return -ENOMEM;
+                                }
+                        }
+                        break;
+
+                case HCI_SCODATA_PKT:
+                        if (skb->len == HCI_SCO_HDR_SIZE) {
+                                struct hci_sco_hdr *h = hci_sco_hdr(skb);
+                                scb->expect = h->dlen;
+
+                                if (skb_tailroom(skb) < scb->expect) {
+                                        kfree_skb(skb);
+                                        hdev->reassembly[index] = NULL;
+                                        return -ENOMEM;
+                                }
+                        }
+                        break;
+                }
+
+                if (scb->expect == 0) {
+                        /* Complete frame */
+
+                        bt_cb(skb)->pkt_type = type;
+                        hci_recv_frame(skb);
+
+                        hdev->reassembly[index] = NULL;
+                        return remain;
+                }
+        }
+
+        return remain;
+}
+
 /* Receive packet type fragment */
 #define __reassembly(hdev, type)  ((hdev)->reassembly[(type) - 2])
 
@@ -1113,6 +1222,41 @@ int hci_recv_fragment(struct hci_dev *hdev, int type, void *data, int count)
 	return 0;
 }
 EXPORT_SYMBOL(hci_recv_fragment);
+
+#define STREAM_REASSEMBLY 0
+
+int hci_recv_stream_fragment(struct hci_dev *hdev, void *data, int count)
+{
+        int type;
+        int rem = 0;
+
+        while (count) {
+                struct sk_buff *skb = hdev->reassembly[STREAM_REASSEMBLY];
+
+                if (!skb) {
+                        struct { char type; } *pkt;
+
+                        /* Start of the frame */
+                        pkt = data;
+                        type = pkt->type;
+
+                        data++;
+                        count--;
+                } else
+                        type = bt_cb(skb)->pkt_type;
+
+                rem = hci_reassembly(hdev, type, data, count,
+                                                        STREAM_REASSEMBLY);
+                if (rem < 0)
+                        return rem;
+
+                data += (count - rem);
+                count = rem;
+        };
+
+        return rem;
+}
+EXPORT_SYMBOL(hci_recv_stream_fragment);
 
 /* ---- Interface to upper protocols ---- */
 
