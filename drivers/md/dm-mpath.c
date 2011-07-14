@@ -33,6 +33,7 @@ struct pgpath {
 	unsigned fail_count;		/* Cumulative failure count */
 
 	struct dm_path path;
+	struct work_struct deactivate_path;
 	struct work_struct activate_path;
 };
 
@@ -115,6 +116,7 @@ static struct workqueue_struct *kmultipathd, *kmpath_handlerd;
 static void process_queued_ios(struct work_struct *work);
 static void trigger_event(struct work_struct *work);
 static void activate_path(struct work_struct *work);
+static void deactivate_path(struct work_struct *work);
 
 
 /*-----------------------------------------------
@@ -127,6 +129,7 @@ static struct pgpath *alloc_pgpath(void)
 
 	if (pgpath) {
 		pgpath->is_active = 1;
+		INIT_WORK(&pgpath->deactivate_path, deactivate_path);
 		INIT_WORK(&pgpath->activate_path, activate_path);
 	}
 
@@ -136,6 +139,14 @@ static struct pgpath *alloc_pgpath(void)
 static void free_pgpath(struct pgpath *pgpath)
 {
 	kfree(pgpath);
+}
+
+static void deactivate_path(struct work_struct *work)
+{
+	struct pgpath *pgpath =
+		container_of(work, struct pgpath, deactivate_path);
+
+	blk_abort_queue(pgpath->path.dev->bdev->bd_disk->queue);
 }
 
 static struct priority_group *alloc_priority_group(void)
@@ -695,6 +706,7 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 
 		if (as->argc < nr_params) {
 			ti->error = "not enough path parameters";
+			r = -EINVAL;
 			goto bad;
 		}
 
@@ -881,6 +893,7 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 	}
 
 	ti->num_flush_requests = 1;
+	ti->num_discard_requests = 1;
 
 	return 0;
 
@@ -982,6 +995,7 @@ static int fail_path(struct pgpath *pgpath)
 		      pgpath->path.dev->name, m->nr_valid_paths);
 
 	schedule_work(&m->trigger_event);
+	queue_work(kmultipathd, &pgpath->deactivate_path);
 
 out:
 	spin_unlock_irqrestore(&m->lock, flags);
@@ -1257,6 +1271,15 @@ static int do_end_io(struct multipath *m, struct request *clone,
 		return 0;	/* I/O complete */
 
 	if (error == -EOPNOTSUPP)
+		return error;
+
+	if (clone->cmd_flags & REQ_DISCARD)
+		/*
+		 * Pass all discard request failures up.
+		 * FIXME: only fail_path if the discard failed due to a
+		 * transport problem.  This requires precise understanding
+		 * of the underlying failure (e.g. the SCSI sense).
+		 */
 		return error;
 
 	if (mpio->pgpath)
