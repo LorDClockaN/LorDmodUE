@@ -23,7 +23,6 @@ union map_info {
 	void *ptr;
 	unsigned long long ll;
 	unsigned flush_request;
-	unsigned target_request_nr;
 };
 
 /*
@@ -180,7 +179,6 @@ struct dm_target {
 	 * to the real underlying devices.
 	 */
 	unsigned num_flush_requests;
- 	unsigned num_discard_requests;
 
 	/* target specific data */
 	void *private;
@@ -393,8 +391,6 @@ void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 
 #define dm_array_too_big(fixed, obj, num) \
 	((num) > (UINT_MAX - (fixed)) / (obj))
-
-#define dm_target_offset(ti, sector) ((sector) - (ti)->begin)
 
 static inline sector_t to_sector(unsigned long n)
 {

@@ -113,15 +113,9 @@ enum rq_flag_bits {
 	__REQ_COPY_USER,	/* contains copies of user pages */
 	__REQ_INTEGRITY,	/* integrity metadata has been remapped */
 	__REQ_NOIDLE,		/* Don't anticipate more IO after this one */
-        __REQ_FLUSH,            /* request for cache flush */
 	__REQ_IO_STAT,		/* account I/O stat */
 	__REQ_MIXED_MERGE,	/* merge of different types, fail separately */
 	__REQ_NR_BITS,		/* stops here */
-        /* bio only flags */
-        __REQ_UNPLUG,           /* unplug the immediately after submission */
-        __REQ_RAHEAD,           /* read ahead, can fail anytime */
-        __REQ_SYNC,             /* request is sync (sync write or read) */
-        __REQ_META,             /* metadata io request */
 };
 
 #define REQ_RW		(1 << __REQ_RW)
@@ -132,8 +126,6 @@ enum rq_flag_bits {
 #define REQ_SORTED	(1 << __REQ_SORTED)
 #define REQ_SOFTBARRIER	(1 << __REQ_SOFTBARRIER)
 #define REQ_HARDBARRIER	(1 << __REQ_HARDBARRIER)
-#define REQ_SYNC                (1 << __REQ_SYNC)
-#define REQ_META                (1 << __REQ_META)
 #define REQ_FUA		(1 << __REQ_FUA)
 #define REQ_NOMERGE	(1 << __REQ_NOMERGE)
 #define REQ_STARTED	(1 << __REQ_STARTED)
@@ -150,7 +142,6 @@ enum rq_flag_bits {
 #define REQ_COPY_USER	(1 << __REQ_COPY_USER)
 #define REQ_INTEGRITY	(1 << __REQ_INTEGRITY)
 #define REQ_NOIDLE	(1 << __REQ_NOIDLE)
-#define REQ_FLUSH               (1 << __REQ_FLUSH)
 #define REQ_IO_STAT	(1 << __REQ_IO_STAT)
 #define REQ_MIXED_MERGE	(1 << __REQ_MIXED_MERGE)
 
@@ -158,10 +149,6 @@ enum rq_flag_bits {
 				 REQ_FAILFAST_DRIVER)
 
 #define BLK_MAX_CDB	16
-
-#define REQ_UNPLUG              (1 << __REQ_UNPLUG)
-#define REQ_RAHEAD              (1 << __REQ_RAHEAD)
-
 
 /*
  * try to put the fields that are referenced together in the same cacheline.
@@ -341,7 +328,6 @@ struct queue_limits {
 	unsigned char		misaligned;
 	unsigned char		discard_misaligned;
 	unsigned char		cluster;
-        unsigned char           no_cluster;
 	signed char		discard_zeroes_data;
 };
 
@@ -464,7 +450,6 @@ struct request_queue
 #endif
 };
 
-#define QUEUE_FLAG_CLUSTER      0       /* cluster several segments into 1 */
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
 #define QUEUE_FLAG_STOPPED	2	/* queue is stopped */
 #define	QUEUE_FLAG_SYNCFULL	3	/* read queue has been filled */
