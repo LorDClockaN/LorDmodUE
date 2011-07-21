@@ -40,6 +40,8 @@
 #define VOICE_STATE_INCALL 0x1
 #define VOICE_STATE_OFFCALL 0x2
 
+#define REAL_STEREO_CHANNEL_MODE	9
+
 struct msm_snddev_info {
 	const char *name;
 	u32 capability;
