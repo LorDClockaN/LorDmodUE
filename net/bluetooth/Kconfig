@@ -27,27 +27,44 @@ menuconfig BT
 	  compile it as module (bluetooth).
 
 	  To use Linux Bluetooth subsystem, you will need several user-space
-	  utilities like hciconfig and bluetoothd.  These utilities and updates
-	  to Bluetooth kernel modules are provided in the BlueZ packages.  For
-	  more information, see <http://www.bluez.org/>.
-
-if BT != n
+	  utilities like hciconfig and hcid.  These utilities and updates to
+	  Bluetooth kernel modules are provided in the BlueZ packages.
+	  For more information, see <http://www.bluez.org/>.
 
 config BT_L2CAP
-	bool "L2CAP protocol support"
+	tristate "L2CAP protocol support"
+	depends on BT
 	select CRC16
 	help
 	  L2CAP (Logical Link Control and Adaptation Protocol) provides
 	  connection oriented and connection-less data transport.  L2CAP
 	  support is required for most Bluetooth applications.
 
+	  Say Y here to compile L2CAP support into the kernel or say M to
+	  compile it as module (l2cap).
+
+config BT_L2CAP_EXT_FEATURES
+	bool "L2CAP Extended Features support (EXPERIMENTAL)"
+	depends on BT_L2CAP && EXPERIMENTAL
+	help
+	  This option enables the L2CAP Extended Features support. These
+	  new features include the Enhanced Retransmission and Streaming
+	  Modes, the Frame Check Sequence (FCS), and Segmentation and
+	  Reassembly (SAR) for L2CAP packets. They are a required for the
+	  new Alternate MAC/PHY and the Bluetooth Medical Profile.
+
+	  You should say N unless you know what you are doing. Note that
+	  this is in an experimental state yet.
+
 config BT_SCO
-	bool "SCO links support"
+	tristate "SCO links support"
+	depends on BT
 	help
 	  SCO link provides voice transport over Bluetooth.  SCO support is
 	  required for voice applications like Headset and Audio.
 
-endif
+	  Say Y here to compile SCO support into the kernel or say M to
+	  compile it as module (sco).
 
 source "net/bluetooth/rfcomm/Kconfig"
 
@@ -56,6 +73,8 @@ source "net/bluetooth/bnep/Kconfig"
 source "net/bluetooth/cmtp/Kconfig"
 
 source "net/bluetooth/hidp/Kconfig"
+
+source "net/bluetooth/hidbrcm/Kconfig"
 
 source "drivers/bluetooth/Kconfig"
 

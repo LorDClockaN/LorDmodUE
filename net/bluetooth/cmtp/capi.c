@@ -35,7 +35,6 @@
 #include <linux/ioctl.h>
 #include <linux/file.h>
 #include <linux/wait.h>
-#include <linux/kthread.h>
 #include <net/sock.h>
 
 #include <linux/isdn/capilli.h>
@@ -144,7 +143,7 @@ static void cmtp_send_capimsg(struct cmtp_session *session, struct sk_buff *skb)
 
 	skb_queue_tail(&session->transmit, skb);
 
-	wake_up_interruptible(sk_sleep(session->sock->sk));
+	cmtp_schedule(session);
 }
 
 static void cmtp_send_interopmsg(struct cmtp_session *session,
@@ -156,8 +155,7 @@ static void cmtp_send_interopmsg(struct cmtp_session *session,
 
 	BT_DBG("session %p subcmd 0x%02x appl %d msgnum %d", session, subcmd, appl, msgnum);
 
-	skb = alloc_skb(CAPI_MSG_BASELEN + 6 + len, GFP_ATOMIC);
-	if (!skb) {
+	if (!(skb = alloc_skb(CAPI_MSG_BASELEN + 6 + len, GFP_ATOMIC))) {
 		BT_ERR("Can't allocate memory for interoperability packet");
 		return;
 	}
@@ -387,7 +385,8 @@ static void cmtp_reset_ctr(struct capi_ctr *ctrl)
 
 	capi_ctr_down(ctrl);
 
-	kthread_stop(session->task);
+	atomic_inc(&session->terminate);
+	cmtp_schedule(session);
 }
 
 static void cmtp_register_appl(struct capi_ctr *ctrl, __u16 appl, capi_register_params *rp)
