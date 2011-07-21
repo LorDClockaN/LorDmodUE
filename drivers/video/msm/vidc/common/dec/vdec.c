@@ -259,6 +259,15 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 			vcd_frame_data->dec_op_prop.disp_frm.right;
 		vdec_msg->vdec_msg_info.msgdata.output_frame.framesize.top =
 			vcd_frame_data->dec_op_prop.disp_frm.top;
+		if (vcd_frame_data->interlaced) {
+                        vdec_msg->vdec_msg_info.msgdata.
+                                output_frame.interlaced_format =
+                                VDEC_InterlaceInterleaveFrameTopFieldFirst;
+                } else {
+                        vdec_msg->vdec_msg_info.msgdata.
+                                output_frame.interlaced_format =
+                                VDEC_InterlaceFrameProgressive;
+                }
 		/* Decoded picture type */
 		switch (vcd_frame_data->frame) {
 		case VCD_FRAME_I:
