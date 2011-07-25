@@ -68,7 +68,6 @@
 #include <mach/qdsp5v2_1x/qdsp5audppmsg.h>
 #include <mach/qdsp5v2_1x/audpp.h>
 
-
 #ifndef MAX
 #define  MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
@@ -108,24 +107,30 @@ struct audio_routing_info {
 	signed int voice_rx_vol;
 	int tx_mute;
 	int rx_mute;
+#ifdef CONFIG_2WCR
 	int voice_state;
+#endif
 };
 
 static struct audio_routing_info routing_info;
 
+#ifdef CONFIG_2WCR
 int msm_get_voice_state(void)
 {
         MM_DBG("voice state %d\n", routing_info.voice_state);
         return routing_info.voice_state;
 }
 EXPORT_SYMBOL(msm_get_voice_state);
+#endif
 
 int msm_set_voice_mute(int dir, int mute)
 {
 	MM_AUD_INFO("dir %x mute %x\n", dir, mute);
+#ifdef CONFIG_2WCR
         if (!audio_dev_ctrl.voice_rx_dev
                 || !audio_dev_ctrl.voice_tx_dev)
                 return -EPERM;
+#endif
 	if (dir == DIR_TX) {
 		routing_info.tx_mute = mute;
 		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
@@ -142,9 +147,11 @@ EXPORT_SYMBOL(msm_set_voice_mute);
 
 int msm_set_voice_vol(int dir, s32 volume)
 {
+#ifdef CONFIG_2WCR
         if (!audio_dev_ctrl.voice_rx_dev
                 || !audio_dev_ctrl.voice_tx_dev)
                 return -EPERM;
+#endif
 	if (dir == DIR_TX) {
 		routing_info.voice_tx_vol = volume;
 		broadcast_event(AUDDEV_EVT_DEVICE_VOL_MUTE_CHG,
@@ -799,14 +806,24 @@ void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 
 	if ((evt_id != AUDDEV_EVT_START_VOICE)
 		&& (evt_id != AUDDEV_EVT_END_VOICE)
+#ifndef CONFIG_2WCR
+		&& (evt_id != AUDDEV_EVT_STREAM_VOL_CHG)) {
+#else
                 && (evt_id != AUDDEV_EVT_STREAM_VOL_CHG)
                 && (evt_id != AUDDEV_EVT_VOICE_STATE_CHG)) {
-		dev_info = audio_dev_ctrl_find_dev(dev_id);
+#endif
+ 		dev_info = audio_dev_ctrl_find_dev(dev_id);
+#ifndef CONFIG_2WCR
+		if (IS_ERR(dev_info))
+#else
                 if (IS_ERR(dev_info)) {
                         MM_ERR("pass invalid dev_id\n");
+#endif
 			return;
 	}
+#ifdef CONFIG_2WCR
         }
+#endif
 
 	if (event.cb != NULL)
 		callback = event.cb;
@@ -814,8 +831,10 @@ void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 		return;
 	mutex_lock(&session_lock);
 
+#ifdef CONFIG_2WCR
         if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
                 routing_info.voice_state = dev_id;
+#endif
 
 	evt_payload = kzalloc(sizeof(union auddev_evt_data),
 			GFP_KERNEL);
@@ -846,10 +865,15 @@ void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 		session_mask = (0x1 << (clnt_id))
 				<< (8 * ((int)callback->clnt_type-1));
 
+#ifdef CONFIG_2WCR
                 if ((evt_id == AUDDEV_EVT_STREAM_VOL_CHG) || 
                         (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)) {
 			MM_DBG("AUDDEV_EVT_STREAM_VOL_CHG or\
                                 AUDDEV_EVT_VOICE_STATE_CHG\n");
+#else
+		if (evt_id == AUDDEV_EVT_STREAM_VOL_CHG) {
+			MM_DBG("AUDDEV_EVT_STREAM_VOL_CHG\n");
+#endif
 			goto volume_strm;
 		}
 
@@ -895,18 +919,26 @@ volume_strm:
 					evt_payload->freq_info.acdb_dev_id
 						= dev_info->acdb_id;
 				}
+#ifndef CONFIG_2WCR
+			} else
+#else
 			} else if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
                                 evt_payload->voice_state =
                                         routing_info.voice_state;
                         else if (dev_info != NULL)
+#endif
 				evt_payload->routing_id = dev_info->copp_id;
 			callback->auddev_evt_listener(
 					evt_id,
 					evt_payload,
 					callback->private_data);
 sent_dec:
+#ifndef CONFIG_2WCR
+			if (evt_id != AUDDEV_EVT_STREAM_VOL_CHG)
+#else
                         if ((evt_id != AUDDEV_EVT_STREAM_VOL_CHG) &&
                                 (evt_id != AUDDEV_EVT_VOICE_STATE_CHG))
+#endif
 				routing_info.dec_freq[clnt_id].freq
 						= dev_info->set_sample_rate;
 
@@ -932,10 +964,14 @@ sent_dec:
 					evt_payload->freq_info.acdb_dev_id
 						= dev_info->acdb_id;
 				}
+#ifndef CONFIG_2WCR
+			} else
+#else
 			} else if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
                                 evt_payload->voice_state =
                                         routing_info.voice_state;
                         else
+#endif
 				evt_payload->routing_id = dev_info->copp_id;
 			callback->auddev_evt_listener(
 					evt_id,
@@ -951,16 +987,26 @@ sent_enc:
 		}
 aud_cal:
 		if (callback->clnt_type == AUDDEV_CLNT_AUDIOCAL) {
+#ifdef CONFIG_2WCR
                         int temp_sessions;
+#endif
 			MM_DBG("AUDDEV_CLNT_AUDIOCAL\n");
+#ifndef CONFIG_2WCR
+			if (!dev_info->sessions)
+#else
 			if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
                                 evt_payload->voice_state =
                                         routing_info.voice_state;
                         else if (!dev_info->sessions)
-				goto sent_aud_cal;
+#endif
+ 				goto sent_aud_cal;
+#ifndef CONFIG_2WCR
+			evt_payload->audcal_info.dev_id = dev_info->copp_id;
+#else
 			else {
                                 evt_payload->audcal_info.dev_id =
                                                 dev_info->copp_id;
+#endif
 			evt_payload->audcal_info.acdb_id =
 				dev_info->acdb_id;
 			evt_payload->audcal_info.dev_type =
@@ -970,6 +1016,8 @@ aud_cal:
 				dev_info->set_sample_rate ?
 				dev_info->set_sample_rate :
 				dev_info->sample_rate;
+
+#ifdef CONFIG_2WCR
                         }
                         if (evt_payload->audcal_info.dev_type ==
                                                 SNDDEV_CAP_TX) {
@@ -989,6 +1037,8 @@ aud_cal:
                                         (temp_sessions >>
                                                 ((AUDDEV_CLNT_DEC-1) * 8));
                         }
+#endif
+
 			callback->auddev_evt_listener(
 				evt_id,
 				evt_payload,
@@ -1029,7 +1079,11 @@ voc_events:
 						SNDDEV_CAP_RX;
 					evt_payload->voc_vm_info.acdb_dev_id =
 						dev_info->acdb_id;
+#ifndef CONFIG_2WCR
+					if (routing_info.rx_mute == 1) /*mute rx*/
+#else
 					if (routing_info.voice_rx_vol < 0)
+#endif
 						evt_payload->
 						voc_vm_info.dev_vm_val.mute =
 							routing_info.rx_mute;
@@ -1055,10 +1109,14 @@ voc_events:
 						= dev_info->acdb_id;
 				} else
 					goto sent_voc;
+#ifndef CONFIG_2WCR
+			} else {
+#else
 			} else if (evt_id == AUDDEV_EVT_VOICE_STATE_CHG)
                                 evt_payload->voice_state =
                                                 routing_info.voice_state;
 			else {
+#endif
 				evt_payload->voc_devinfo.dev_type =
 					(dev_info->capability & SNDDEV_CAP_TX) ?
 					SNDDEV_CAP_TX : SNDDEV_CAP_RX;
@@ -1145,7 +1203,9 @@ static int __init audio_dev_ctrl_init(void)
 	audio_dev_ctrl.num_dev = 0;
 	audio_dev_ctrl.voice_tx_dev = NULL;
 	audio_dev_ctrl.voice_rx_dev = NULL;
+#ifdef CONFIG_2WCR
         routing_info.voice_state = VOICE_STATE_INVALID;
+#endif
 	return misc_register(&audio_dev_ctrl_misc);
 }
 

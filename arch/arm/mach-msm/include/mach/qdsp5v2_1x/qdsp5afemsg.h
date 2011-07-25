@@ -32,7 +32,9 @@
 #define AFE_APU_MSG_CODEC_CONFIG_ACK_LEN	\
 	sizeof(struct afe_msg_codec_config_ack)
 
+#ifdef CONFIG_2WCR 
 #define AFE_APU_MSG_VOC_TIMING_SUCCESS          0x0002
+#endif
 
 #define AFE_MSG_CODEC_CONFIG_ENABLED 0x1
 #define AFE_MSG_CODEC_CONFIG_DISABLED 0xFFFF

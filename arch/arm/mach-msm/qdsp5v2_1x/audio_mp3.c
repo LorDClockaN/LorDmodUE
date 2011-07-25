@@ -303,7 +303,9 @@ static int audio_enable(struct audio *audio)
 	if (audio->enabled)
 		return 0;
 
+#ifdef CONFIG_2WCR 
 	audio->dec_state = MSM_AUD_DECODER_STATE_NONE;
+#endif
 	audio->out_tail = 0;
 	audio->out_needed = 0;
 

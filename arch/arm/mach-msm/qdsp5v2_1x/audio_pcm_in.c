@@ -42,9 +42,11 @@
 #define MONO_DATA_SIZE		(2048)
 #define STEREO_DATA_SIZE	(MONO_DATA_SIZE * 2)
 #define DMASZ 			(FRAME_SIZE * FRAME_NUM)
+#ifdef CONFIG_2WCR
 #define AUDIO_GET_VOICE_STATE   _IOR(AUDIO_IOCTL_MAGIC, 55, unsigned)
 
 extern int msm_get_voice_state(void);
+#endif
 
 struct buffer {
 	void *data;
@@ -78,7 +80,9 @@ struct audio_in {
 	uint32_t in_head; /* next buffer dsp will write */
 	uint32_t in_tail; /* next buffer read() will read */
 	uint32_t in_count; /* number of buffers available to read() */
+#ifdef CONFIG_2WCR
         uint32_t mode;
+#endif
 
 	const char *module_name;
 	unsigned queue_ids;
@@ -86,9 +90,13 @@ struct audio_in {
 
 	uint16_t source; /* Encoding source bit mask */
 	uint32_t device_events; /* device events interested in */
+#ifdef CONFIG_2WCR
         uint32_t in_call;
+#endif
 	uint32_t dev_cnt;
+#ifdef CONFIG_2WCR
         int voice_state;
+#endif
 	spinlock_t dev_lock;
 
 	/* data allocated for various buffers */
@@ -144,7 +152,9 @@ static void pcm_in_listener(u32 evt_id, union auddev_evt_data *evt_payload,
 		MM_DBG("AUDDEV_EVT_DEV_RDY\n");
 		spin_lock_irqsave(&audio->dev_lock, flags);
 		audio->dev_cnt++;
+#ifdef CONFIG_2WCR
                 if (!audio->in_call)
+#endif
 		audio->source |= (0x1 << evt_payload->routing_id);
 		spin_unlock_irqrestore(&audio->dev_lock, flags);
 
@@ -157,7 +167,9 @@ static void pcm_in_listener(u32 evt_id, union auddev_evt_data *evt_payload,
 		MM_DBG("AUDDEV_EVT_DEV_RLS\n");
 		spin_lock_irqsave(&audio->dev_lock, flags);
 		audio->dev_cnt--;
+#ifdef CONFIG_2WCR
                 if (!audio->in_call)
+#endif
 		audio->source &= ~(0x1 << evt_payload->routing_id);
 		spin_unlock_irqrestore(&audio->dev_lock, flags);
 
@@ -173,6 +185,7 @@ static void pcm_in_listener(u32 evt_id, union auddev_evt_data *evt_payload,
 
 		break;
 	}
+#ifdef CONFIG_2WCR
         case AUDDEV_EVT_VOICE_STATE_CHG: {
                 MM_DBG("AUDDEV_EVT_VOICE_STATE_CHG, state = %d\n",
                                 evt_payload->voice_state);
@@ -187,6 +200,7 @@ static void pcm_in_listener(u32 evt_id, union auddev_evt_data *evt_payload,
                 }
                 break;
         }
+#endif
 	case AUDDEV_EVT_FREQ_CHG: {
 		MM_DBG("Encoder Driver got sample rate change event\n");
 		MM_DBG("sample rate %d\n", evt_payload->freq_info.sample_rate);
@@ -272,9 +286,13 @@ static void audrec_dsp_event(void *data, unsigned id, size_t len,
 	case AUDREC_CMD_MEM_CFG_DONE_MSG: {
 		MM_DBG("CMD_MEM_CFG_DONE MSG DONE\n");
 		audio->running = 1;
+#ifndef CONFIG_2WCR
+		if (audio->dev_cnt > 0)
+#else
                 if ((!audio->in_call && (audio->dev_cnt > 0)) ||
                         (audio->in_call &&
                                 (audio->voice_state == VOICE_STATE_INCALL)))
+#endif
 			audpcm_in_record_config(audio, 1);
 		break;
 	}
@@ -391,6 +409,7 @@ static int audpcm_in_record_config(struct audio_in *audio, int enable)
 		cmd.destination_activity = AUDIO_RECORDING_TURN_OFF;
 
 	cmd.source_mix_mask = audio->source;
+#ifdef CONFIG_2WCR
         if (audio->enc_id == 2) {
                 if ((cmd.source_mix_mask &
                                 INTERNAL_CODEC_TX_SOURCE_MIX_MASK) ||
@@ -403,6 +422,7 @@ static int audpcm_in_record_config(struct audio_in *audio, int enable)
                                 AUDPP_A2DP_PIPE_SOURCE_MIX_MASK)
                         cmd.pipe_id |= SOURCE_PIPE_0;
         }
+#endif
 
 	return audpreproc_send_audreccmdqueue(&cmd, sizeof(cmd));
 }
@@ -514,12 +534,15 @@ static long audpcm_in_ioctl(struct file *file,
 		if (copy_to_user((void *) arg, &stats, sizeof(stats)))
 			return -EFAULT;
 		return rc;
+#ifdef CONFIG_2WCR
 	} else if (cmd == AUDIO_GET_VOICE_STATE) {
                 int vstate = audio->voice_state;
                 if (copy_to_user((void *) arg, &vstate, sizeof(vstate)))
                         return -EFAULT;
                 return rc;
+#endif
 	}
+
 	mutex_lock(&audio->lock);
 	switch (cmd) {
 	case AUDIO_START: {
@@ -527,10 +550,12 @@ static long audpcm_in_ioctl(struct file *file,
 		/* Poll at 48KHz always */
 		freq = 48000;
 		MM_DBG("AUDIO_START\n");
+#ifdef CONFIG_2WCR
                 if (audio->in_call && (audio->voice_state != VOICE_STATE_INCALL)) {
                         rc = -EPERM;
                         break;
                 }
+#endif
 		rc = msm_snddev_request_freq(&freq, audio->enc_id,
 					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
 		MM_DBG("sample rate configured %d sample rate requested %d\n",
@@ -555,20 +580,29 @@ static long audpcm_in_ioctl(struct file *file,
 			else
 				rc = 0;
 		}
+#ifdef CONFIG_2WCR
                 audio->stopped = 0;
+#endif
 		break;
 	}
 	case AUDIO_STOP: {
+#ifdef CONFIG_2WCR
 		MM_DBG("AUDIO_STOP\n");
+#endif
 		rc = audpcm_in_disable(audio);
 		rc = msm_snddev_withdraw_freq(audio->enc_id,
 					SNDDEV_CAP_TX, AUDDEV_CLNT_ENC);
+#ifndef CONFIG_2WCR
+		MM_DBG("msm_snddev_withdraw_freq\n");
+#endif
 		audio->stopped = 1;
 		audio->abort = 0;
 		break;
 	}
 	case AUDIO_FLUSH: {
+#ifdef CONFIG_2WCR
 		MM_DBG("AUDIO_FLUSH\n");
+#endif
 		if (audio->stopped) {
 			/* Make sure we're stopped and we wake any threads
 			 * that might be blocked holding the read_lock.
@@ -590,16 +624,25 @@ static long audpcm_in_ioctl(struct file *file,
 		}
 		if (cfg.channel_count == 1) {
 			cfg.channel_count = AUDREC_CMD_MODE_MONO;
+#ifdef CONFIG_2WCR
                         audio->buffer_size = MONO_DATA_SIZE;
+#endif
 		} else if (cfg.channel_count == 2) {
 			cfg.channel_count = AUDREC_CMD_MODE_STEREO;
+#ifdef CONFIG_2WCR
 			audio->buffer_size = STEREO_DATA_SIZE;
+#endif
 		} else {
 			rc = -EINVAL;
 			break;
 		}
 		audio->samp_rate = cfg.sample_rate;
 		audio->channel_mode = cfg.channel_count;
+#ifndef CONFIG_2WCR
+		audio->buffer_size =
+				audio->channel_mode ? STEREO_DATA_SIZE : \
+					MONO_DATA_SIZE;
+#endif
 		break;
 	}
 	case AUDIO_GET_CONFIG: {
@@ -616,6 +659,7 @@ static long audpcm_in_ioctl(struct file *file,
 			rc = -EFAULT;
 		break;
 	}
+#ifdef CONFIG_2WCR
         case AUDIO_SET_INCALL: {
                 struct msm_voicerec_mode cfg;
                 unsigned long flags;
@@ -644,6 +688,7 @@ static long audpcm_in_ioctl(struct file *file,
                 }
                 break;
         }
+#endif
 	case AUDIO_GET_SESSION_ID: {
 		if (copy_to_user((void *) arg, &audio->enc_id,
 			sizeof(unsigned short))) {
@@ -674,24 +719,35 @@ static ssize_t audpcm_in_read(struct file *file,
 	while (count > 0) {
 		rc = wait_event_interruptible(
 			audio->wait, (audio->in_count > 0) || audio->stopped ||
+#ifndef CONFIG_2WCR
+			audio->abort);
+#else
                         audio->abort || (audio->in_call && audio->running &&
                                 (audio->voice_state == VOICE_STATE_OFFCALL)));
+#endif
 
 		if (rc < 0)
 			break;
 
+#ifndef CONFIG_2WCR
+		if (audio->stopped && !audio->in_count) {
+			MM_DBG("Driver in stop state, No more buffer to read");
+#else
                 if (!audio->in_count) {
                         if (audio->stopped) {
                                 MM_DBG("Driver in stop state, No more \
                                                 buffer to read");
+#endif
 			rc = 0;/* End of File */
 			break;
+#ifdef CONFIG_2WCR
                         } else if (audio->in_call && audio->running &&
                                 (audio->voice_state == VOICE_STATE_OFFCALL)) {
                                 MM_DBG("Not Permitted Voice Terminated\n");
                                 rc = -EPERM; /* Voice Call stopped */
                                 break;
                         }
+#endif
 		}
 
 		if (audio->abort) {
@@ -747,7 +803,9 @@ static int audpcm_in_release(struct inode *inode, struct file *file)
 	struct rtc_time tm;
 
 	mutex_lock(&audio->lock);
+#ifdef CONFIG_2WCR
         audio->in_call = 0;
+#endif
 	/* with draw frequency for session
 	   incase not stopped the driver */
 	msm_snddev_withdraw_freq(audio->enc_id, SNDDEV_CAP_TX,
@@ -784,7 +842,9 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 		goto done;
 	}
 
+#ifdef CONFIG_2WCR
 	audio->mode = MSM_AUD_ENC_MODE_TUNNEL;
+#endif
 
 	/* Settings will be re-config at AUDIO_SET_CONFIG,
 	 * but at least we need to have initial config
@@ -792,7 +852,11 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 	audio->channel_mode = AUDREC_CMD_MODE_MONO;
 	audio->buffer_size = MONO_DATA_SIZE;
 	audio->samp_rate = 8000;
+#ifndef CONFIG_2WCR
+	audio->enc_type = ENC_TYPE_WAV;
+#else
 	audio->enc_type = ENC_TYPE_WAV | audio->mode;
+#endif
 	audio->source = INTERNAL_CODEC_TX_SOURCE_MIX_MASK;
 
 	encid = audpreproc_aenc_alloc(audio->enc_type, &audio->module_name,
@@ -803,7 +867,9 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 		goto done;
 	}
 	audio->enc_id = encid;
+#ifdef CONFIG_2WCR
 	MM_DBG("allocated encoder %d, module %s\n", encid, audio->module_name);
+#endif
 
 	rc = msm_adsp_get(audio->module_name, &audio->audrec,
 			   &audrec_adsp_ops, audio);
@@ -818,10 +884,14 @@ static int audpcm_in_open(struct inode *inode, struct file *file)
 	audio->abort = 0;
 	audpcm_in_flush(audio);
 	audio->device_events = AUDDEV_EVT_DEV_RDY | AUDDEV_EVT_DEV_RLS |
+#ifndef CONFIG_2WCR
+				AUDDEV_EVT_FREQ_CHG;
+#else
 				AUDDEV_EVT_FREQ_CHG |
                                 AUDDEV_EVT_VOICE_STATE_CHG;
 
         audio->voice_state = msm_get_voice_state();
+#endif
 
 	rc = auddev_register_evt_listner(audio->device_events,
 					AUDDEV_CLNT_ENC, audio->enc_id,
