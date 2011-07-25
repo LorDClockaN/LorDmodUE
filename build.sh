@@ -10,6 +10,7 @@ make -j$CPU_JOB_NUM ARCH=arm CROSS_COMPILE=$TOOLCHAIN/$TOOLCHAIN_PREFIX;
 
 cp arch/arm/boot/zImage ../finished/;
 cp drivers/net/wireless/bcm4329/bcm4329.ko ../finished/;
+cp arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko ../finished/;
 
 echo "COMPILING FINISHED!!!";
 read;
