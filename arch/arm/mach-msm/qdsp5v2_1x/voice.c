@@ -853,6 +853,10 @@ static int voice_thread(void *data)
 				/* update voice state */
 				v->voc_state = VOICE_ACQUIRE;
 				pr_aud_info("voc_state -> VOICE_ACQUIRE\n");
+#ifdef CONFIG_2WCR
+                                broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
+                                        VOICE_STATE_INCALL, SESSION_IGNORE);
+#endif
 			} else {
 				MM_AUD_ERR("Get DEV_CHANGE_READY "
 					"at the wrong voc_state %d\n", v->voc_state);
