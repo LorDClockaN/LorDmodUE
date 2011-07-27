@@ -135,13 +135,13 @@ static unsigned int ramp_up_step;
  * Miminum Freqeuncy delta when ramping down.
  * zero disables and will calculate ramp down according to load heuristic.
  */
-#define DEFAULT_RAMP_DOWN_STEP 0
+#define DEFAULT_RAMP_DOWN_STEP 384000
 static unsigned int ramp_down_step;
 
 /*
  * CPU freq will be increased if measured load > max_cpu_load;
  */
-#define DEFAULT_MAX_CPU_LOAD 80
+#define DEFAULT_MAX_CPU_LOAD 70
 static unsigned long max_cpu_load;
 
 #define DEFAULT_X_CPU_LOAD 80
@@ -152,7 +152,7 @@ static unsigned long x_cpu_load;
  */
 #define DEFAULT_MIN_CPU_LOAD 35
 static unsigned long min_cpu_load;
-#define RAPID_MIN_CPU_LOAD 35
+#define RAPID_MIN_CPU_LOAD 20
 static unsigned long rapid_min_cpu_load;
 
 
