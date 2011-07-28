@@ -171,15 +171,14 @@ EXPORT_SYMBOL(free_task);
 static inline void free_signal_struct(struct signal_struct *sig)
 {
 	taskstats_tgid_free(sig);
+	sched_autogroup_exit(sig);
 	kmem_cache_free(signal_cachep, sig);
 }
 
 static inline void put_signal_struct(struct signal_struct *sig)
 {
-	if (atomic_dec_and_test(&sig->sigcnt)) {
-		sched_autogroup_exit(sig);
+	if (atomic_dec_and_test(&sig->sigcnt))
 		free_signal_struct(sig);
-	}
 }
 
 int task_free_register(struct notifier_block *n)
@@ -1322,7 +1321,7 @@ bad_fork_cleanup_mm:
 		mmput(p->mm);
 bad_fork_cleanup_signal:
 	if (!(clone_flags & CLONE_THREAD))
-		free_signal_struct(p->signal);
+		put_signal_struct(p->signal);
 bad_fork_cleanup_sighand:
 	__cleanup_sighand(p->sighand);
 bad_fork_cleanup_fs:
