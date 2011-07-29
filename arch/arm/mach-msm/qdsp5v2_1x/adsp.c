@@ -431,11 +431,7 @@ int msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 								cmd_size);
 		if (rc == -EAGAIN)
 			udelay(50);
-#ifdef CONFIG_2WCR
 	} while (rc == -EAGAIN && retries++ < 300);
-#else
-	} while (rc == -EAGAIN && retries++ < 100);
-#endif
 	if (retries > 20)
 		MM_AUD_INFO("%s command took %d attempts: rc %d\n",
 			module->name, retries, rc);
