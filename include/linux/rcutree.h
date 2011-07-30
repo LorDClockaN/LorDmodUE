@@ -32,6 +32,7 @@
 
 struct notifier_block;
 
+extern void rcu_init(void);
 extern void rcu_sched_qs(int cpu);
 extern void rcu_bh_qs(int cpu);
 extern void rcu_note_context_switch(int cpu);

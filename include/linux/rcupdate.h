@@ -53,7 +53,6 @@ extern void synchronize_sched_expedited(void);
 extern int sched_expedited_torture_stats(char *page);
 
 /* Internal to kernel */
-extern void rcu_init(void);
 
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_TREE_PREEMPT_RCU)
 #include <linux/rcutree.h>
