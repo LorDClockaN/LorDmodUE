@@ -53,6 +53,10 @@
 #define PNOENABLE_SET_CMD			"PNOFORCE"
 #define PNODEBUG_SET_CMD			"PNODEBUG"
 #define TXPOWER_SET_CMD				"TXPOWER"
+#define RXFILTER_START_CMD			"RXFILTER-START"
+#define RXFILTER_STOP_CMD			"RXFILTER-STOP"
+#define RXFILTER_ADD_CMD			"RXFILTER-ADD"
+#define RXFILTER_REMOVE_CMD			"RXFILTER-REMOVE"
 
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -61,6 +65,12 @@
 typedef struct wl_iw_extra_params {
 	int 	target_channel;
 } wl_iw_extra_params_t;
+
+struct cntry_locales_custom {
+	char iso_abbrev[WLC_CNTRY_BUF_SZ];
+	char custom_locale[WLC_CNTRY_BUF_SZ];
+	int32 custom_locale_rev;
+};
 
 #define	WL_IW_RSSI_MINVAL	-200
 #define	WL_IW_RSSI_NO_SIGNAL	-91
@@ -198,8 +208,7 @@ extern int net_os_wake_lock_timeout_enable(struct net_device *dev);
 extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val);
 extern int net_os_set_dtim_skip(struct net_device *dev, int val);
-extern int net_os_set_packet_filter(struct net_device *dev, int val);
-extern void dhd_bus_country_set(struct net_device *dev, char *country_code);
+extern void get_customized_country_code(char *country_iso_code, wl_country_t *cspec);
 extern char *dhd_bus_country_get(struct net_device *dev);
 extern int dhd_get_dtim_skip(dhd_pub_t *dhd);
 
@@ -229,6 +238,7 @@ extern int dhd_dev_pno_set(struct net_device *dev, wlc_ssid_t* ssids_local, \
 				 int nssid, ushort  scan_fr, int pno_repeat, int pno_freq_expo_max);
 extern int dhd_dev_pno_enable(struct net_device *dev,  int pfn_enabled);
 extern int dhd_dev_get_pno_status(struct net_device *dev);
+extern void dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec);
 
 #define PNO_TLV_PREFIX			'S'
 #define PNO_TLV_VERSION			'1'
