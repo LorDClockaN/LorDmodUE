@@ -7258,7 +7258,7 @@ void proc_sched_set_task(struct task_struct *p)
 {}
 #endif
 
-/* No RCU torture test support */
+/* No RCU torture test support 
 void synchronize_sched_expedited(void)
 {
 	barrier();
@@ -7281,3 +7281,4 @@ unsigned long default_scale_smt_power(struct sched_domain *sd, int cpu)
 	return smt_gain;
 }
 #endif
+*/
