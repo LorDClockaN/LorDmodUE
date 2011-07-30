@@ -233,6 +233,9 @@ static void show_tiny_preempt_stats(struct seq_file *m)
 		seq_puts(m, "no");
 		break;
 	case 1:
+		seq_puts(m, "begun");
+		break;
+	case 2:
 		seq_puts(m, "done");
 		break;
 	default:
@@ -288,6 +291,7 @@ static int rcu_boost(void)
 	raw_local_irq_restore(flags);
 	rt_mutex_lock(&mtx);
 	RCU_TRACE(rcu_preempt_ctrlblk.n_tasks_boosted++);
+	rcu_preempt_ctrlblk.boosted_this_gp++;
 	rt_mutex_unlock(&mtx);
 	return rcu_preempt_ctrlblk.boost_tasks != NULL;
 }
