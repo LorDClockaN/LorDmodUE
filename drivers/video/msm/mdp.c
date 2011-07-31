@@ -1221,6 +1221,7 @@ int mdp_probe(struct platform_device *pdev)
 
         mdp->ebi1_clk = clk_get(NULL, "ebi1_clk");
         if (IS_ERR(mdp->ebi1_clk)) {
+		kfree(mdp);
                 PR_DISP_ERR("mdp: failed to get ebi1 clk\n");
                 ret = PTR_ERR(mdp->ebi1_clk);
                 goto error_get_ebi1_clk;
