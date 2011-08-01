@@ -286,6 +286,26 @@ void *flex_array_get(struct flex_array *fa, unsigned int element_nr)
 	return &part->elements[index_inside_part(fa, element_nr)];
 }
 
+/**
+ * flex_array_get_ptr - pull a ptr back out of the array
+ * @fa:		the flex array from which to extract data
+ * @element_nr:	index of the element to fetch from the array
+ *
+ * Returns the pointer placed in the flex array at element_nr using
+ * flex_array_put_ptr().  This function should not be called if the
+ * element in question was not set using the _put_ptr() helper.
+ */
+void *flex_array_get_ptr(struct flex_array *fa, unsigned int element_nr)
+{
+	void **tmp;
+
+	tmp = flex_array_get(fa, element_nr);
+	if (!tmp)
+		return NULL;
+
+	return *tmp;
+}
+
 static int part_is_free(struct flex_array_part *part)
 {
 	int i;

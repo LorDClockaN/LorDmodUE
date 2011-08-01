@@ -70,4 +70,10 @@ int flex_array_clear(struct flex_array *fa, unsigned int element_nr);
 void *flex_array_get(struct flex_array *fa, unsigned int element_nr);
 int flex_array_shrink(struct flex_array *fa);
 
+#define flex_array_put_ptr(fa, nr, src, gfp)	({						\
+						 void *_src = (src);				\
+						 flex_array_put((fa), (nr), &_src, (gfp));	\
+						})
+void *flex_array_get_ptr(struct flex_array *fa, unsigned int element_nr);
+
 #endif /* _FLEX_ARRAY_H */
