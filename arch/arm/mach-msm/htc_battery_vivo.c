@@ -94,7 +94,7 @@ tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec); \
 #define HTC_PROCEDURE_SET_FULL_LEVEL	7
 #define HTC_PROCEDURE_GET_USB_ACCESSORY_ADC_LEVEL	10
 
-const char *charger_tags[] = {"none", "USB", "AC"};
+const char *charger_tags[] = {"none", "USB", "AC", "SUPER AC", "WIRELESS CHARGER"};
 
 struct htc_battery_info {
 	int device_id;
@@ -184,6 +184,17 @@ static struct power_supply htc_power_supplies[] = {
 		.num_properties = ARRAY_SIZE(htc_power_properties),
 		.get_property = htc_power_get_property,
 	},
+#ifdef CONFIG_WIRELESS_CHARGER
+	{
+		.name = "wireless",
+		.type = POWER_SUPPLY_TYPE_WIRELESS,
+		.supplied_to = supply_list,
+		.num_supplicants = ARRAY_SIZE(supply_list),
+		.properties = htc_power_properties,
+		.num_properties = ARRAY_SIZE(htc_power_properties),
+		.get_property = htc_power_get_property,
+	},
+#endif
 };
 
 static int update_batt_info(void);
@@ -205,6 +216,19 @@ int unregister_notifier_cable_status(struct notifier_block *nb)
 {
 	return blocking_notifier_chain_unregister(&cable_status_notifier_list, nb);
 }
+
+#ifdef CONFIG_WIRELESS_CHARGER
+static BLOCKING_NOTIFIER_HEAD(wireless_charger_notifier_list);
+int register_notifier_wireless_charger(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&wireless_charger_notifier_list, nb);
+}
+
+int unregister_notifier_wireless_charger(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&wireless_charger_notifier_list, nb);
+}
+#endif
 
 /* -------------------------------------------------------------------------- */
 /* For sleep charging screen. */
@@ -230,6 +254,17 @@ static int htc_is_cable_in(void)
 	}
 	return (htc_batt_info.rep.charging_source != CHARGER_BATTERY) ? 1 : 0;
 }
+
+#ifdef CONFIG_WIRELESS_CHARGER
+/* For touch panel, touch panel may loss wireless charger notification when system boot up */
+int htc_is_wireless_charger(void)
+{
+        if (htc_battery_initial)
+                return (htc_batt_info.rep.charging_source == CHARGER_WIRELESS) ? 1 : 0;
+        else
+                return -1;
+}
+#endif
 
 /**
  * htc_power_policy - check if it obeys our policy
@@ -465,15 +500,21 @@ int update_port_list_charging_state(int enable);
 static int htc_cable_status_update(int status)
 {
 	int rc = 0;
-//	unsigned last_source;
+	unsigned last_source;
 
 	if (!htc_battery_initial)
 		return 0;
-
+#ifdef CONFIG_WIRELESS_CHARGER
+	if (status < CHARGER_BATTERY || status > CHARGER_WIRELESS) {
+		BATT_ERR("%s: Not supported cable status received!", __func__);
+		return -EINVAL;
+	}
+#else
 	if (status < CHARGER_BATTERY || status > CHARGER_SUPER_AC) {
 		BATT_ERR("%s: Not supported cable status received!", __func__);
 		return -EINVAL;
 	}
+#endif
 
 	mutex_lock(&htc_batt_info.lock);
 #if 1
@@ -489,6 +530,7 @@ static int htc_cable_status_update(int status)
 		return 0;
 	}
 
+	last_source = htc_batt_info.rep.charging_source;
 	/* TODO: replace charging_source to vbus_present */
 	htc_batt_info.rep.charging_source = status;
 	/* ARM9 should know the status it notifies,
@@ -501,8 +543,20 @@ static int htc_cable_status_update(int status)
 	if ((htc_batt_info.guage_driver == GUAGE_MODEM) && (status == CHARGER_AC)) {
 		htc_set_smem_cable_type(CHARGER_AC);
 		power_supply_changed(&htc_power_supplies[CHARGER_AC]);
-	} else
-		msm_hsusb_set_vbus_state(!!htc_batt_info.rep.charging_source);
+	} else {
+		if (status == CHARGER_WIRELESS) {
+			BATT_LOG("batt: Wireless charger detected. "
+				"We don't need to inform USB driver.");
+			blocking_notifier_call_chain(&wireless_charger_notifier_list, status, NULL);
+			power_supply_changed(&htc_power_supplies[WIRELESS_SUPPLY]);
+			update_wake_lock(htc_batt_info.rep.charging_source);
+		} else {
+			/* We need to notify other driver as wireless charger out. */
+			if (last_source == CHARGER_WIRELESS)
+				blocking_notifier_call_chain(&wireless_charger_notifier_list, status, NULL);
+			msm_hsusb_set_vbus_state(!!htc_batt_info.rep.charging_source);
+		}
+	}
 
 	/* TODO: use power_supply_change to notify battery drivers. */
 	if (htc_batt_info.guage_driver == GUAGE_DS2784 ||
@@ -970,6 +1024,10 @@ static int htc_power_get_property(struct power_supply *psy,
 			val->intval = (charger ==  CHARGER_USB ? 1 : 0);
 			if (htc_batt_debug_mask & HTC_BATT_DEBUG_USER_QUERY)
 				BATT_LOG("%s: %s: online=%d", __func__, psy->name, val->intval);
+		} else if (psy->type == POWER_SUPPLY_TYPE_WIRELESS) {
+			val->intval = (charger ==  CHARGER_WIRELESS ? 1 : 0);
+			if (htc_batt_debug_mask & HTC_BATT_DEBUG_USER_QUERY)
+				BATT_LOG("%s: %s: online=%d", __func__, psy->name, val->intval);
 		} else
 			val->intval = 0;
 		break;
@@ -1005,6 +1063,7 @@ static int htc_battery_get_charging_status(void)
 	case CHARGER_USB:
 	case CHARGER_AC:
 	case CHARGER_SUPER_AC:
+	case CHARGER_WIRELESS:
 #if !defined(CONFIG_BATTERY_DS2746)
 		if ((htc_charge_full) && (htc_batt_info.rep.full_level == 100)) {
 			htc_batt_info.rep.level = 100;

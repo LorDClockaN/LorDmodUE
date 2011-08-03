@@ -186,6 +186,7 @@ int tps_set_charger_ctrl(u32 ctl)
 		tps65200_i2c_write_byte(0x28, 0x00);
 		break;
 	case ENABLE_SLOW_CHG:
+	case ENABLE_WIRELESS_CHG:
 		pr_info("Switch charger ON (SLOW)\n");
 		tps65200_i2c_write_byte(0x29, 0x01);
 		tps65200_i2c_write_byte(0x2A, 0x00);

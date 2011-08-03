@@ -760,6 +760,13 @@ config HTC_PWRSINK
 	default y
 	bool "HTC Power Sink Driver"
 
+config WIRELESS_CHARGER
+	depends on HTC_BATTCHG_VIVO
+	default n
+	bool "Wireless Charger support"
+	help
+	  For wireless charging on mecha.
+
 config MSM_SPM
 	bool "Subsystem Power Manager"
 	depends on ARCH_MSM7X30

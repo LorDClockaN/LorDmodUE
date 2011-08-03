@@ -24,6 +24,7 @@ enum batt_ctl_t {
 	ENABLE_SLOW_CHG,
 	ENABLE_FAST_CHG,
 	ENABLE_SUPER_CHG,
+    ENABLE_WIRELESS_CHG,
 	CHARGER_CHK,
 	TOGGLE_CHARGER,
 	ENABLE_MIN_TAPER,
@@ -38,7 +39,15 @@ enum charger_type_t {
 	CHARGER_BATTERY = 0,
 	CHARGER_USB,
 	CHARGER_AC,
-	CHARGER_SUPER_AC
+	CHARGER_SUPER_AC,
+	CHARGER_WIRELESS
+};
+
+enum power_supplies_type {
+	BATTERY_SUPPLY,
+	USB_SUPPLY,
+	AC_SUPPLY,
+	WIRELESS_SUPPLY
 };
 
 enum charger_control_flag {
@@ -105,6 +114,12 @@ extern int unregister_notifier_cable_status(struct notifier_block *nb);
 #else
 static int register_notifier_cable_status(struct notifier_block *nb) { return 0; }
 static int unregister_notifier_cable_status(struct notifier_block *nb) { return 0; }
+#endif
+
+#ifdef CONFIG_WIRELESS_CHARGER
+extern int register_notifier_wireless_charger(struct notifier_block *nb);
+extern int unregister_notifier_wireless_charger(struct notifier_block *nb);
+extern int htc_is_wireless_charger(void);
 #endif
 
 #if defined(CONFIG_BATTERY_DS2784)
