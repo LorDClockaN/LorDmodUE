@@ -1,5 +1,5 @@
 /*
- *  drivers/cpufreq/cpufreq_ondemandX.c
+ *  drivers/cpufreq/cpufreq_ondemandx.c
  *
  *  Copyright (C)  2001 Russell King
  *            (C)  2003 Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>.
@@ -66,7 +66,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMANDX
 static
 #endif
-struct cpufreq_governor cpufreq_gov_ondemandX = {
+struct cpufreq_governor cpufreq_gov_ondemandx = {
        .name                   = "ondemandX",
        .governor               = cpufreq_governor_dbs,
        .max_transition_latency = TRANSITION_LATENCY_LIMIT,
@@ -103,7 +103,7 @@ static unsigned int dbs_enable=0;	/* number of CPUs using this policy */
 
 // used for imoseyon's mods
 static unsigned int suspended = 0;
-static void ondemandX_suspend(int suspend)
+static void ondemandx_suspend(int suspend)
 {
         struct cpu_dbs_info_s *dbs_info = &per_cpu(od_cpu_dbs_info, smp_processor_id());
         if (dbs_enable==0) return;
@@ -111,26 +111,26 @@ static void ondemandX_suspend(int suspend)
                 suspended = 0;
                 __cpufreq_driver_target(dbs_info->cur_policy, dbs_info->cur_policy->max, 
 			CPUFREQ_RELATION_L);
-                pr_info("[imoseyon] ondemandX awake at %d\n", dbs_info->cur_policy->cur);
+                pr_info("[imoseyon] ondemandx awake at %d\n", dbs_info->cur_policy->cur);
         } else {
                 suspended = 1;
 		// let's give it a little breathing room
                 __cpufreq_driver_target(dbs_info->cur_policy, suspendfreq, CPUFREQ_RELATION_H);
-                pr_info("[imoseyon] ondemandX suspended at %d\n", dbs_info->cur_policy->cur);
+                pr_info("[imoseyon] ondemandx suspended at %d\n", dbs_info->cur_policy->cur);
         }
 }
 
-static void ondemandX_early_suspend(struct early_suspend *handler) {
-       ondemandX_suspend(1);
+static void ondemandx_early_suspend(struct early_suspend *handler) {
+       ondemandx_suspend(1);
 }
 
-static void ondemandX_late_resume(struct early_suspend *handler) {
-       ondemandX_suspend(0);
+static void ondemandx_late_resume(struct early_suspend *handler) {
+       ondemandx_suspend(0);
 }
 
-static struct early_suspend ondemandX_power_suspend = {
-        .suspend = ondemandX_early_suspend,
-        .resume = ondemandX_late_resume,
+static struct early_suspend ondemandx_power_suspend = {
+        .suspend = ondemandx_early_suspend,
+        .resume = ondemandx_late_resume,
         .level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
 };
 
@@ -253,18 +253,18 @@ static unsigned int powersave_bias_target(struct cpufreq_policy *policy,
 	return freq_hi;
 }
 
-static void ondemandX_powersave_bias_init_cpu(int cpu)
+static void ondemandx_powersave_bias_init_cpu(int cpu)
 {
 	struct cpu_dbs_info_s *dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
 	dbs_info->freq_table = cpufreq_frequency_get_table(cpu);
 	dbs_info->freq_lo = 0;
 }
 
-static void ondemandX_powersave_bias_init(void)
+static void ondemandx_powersave_bias_init(void)
 {
 	int i;
 	for_each_online_cpu(i) {
-		ondemandX_powersave_bias_init_cpu(i);
+		ondemandx_powersave_bias_init_cpu(i);
 	}
 }
 
@@ -278,7 +278,7 @@ static ssize_t show_sampling_rate_min(struct kobject *kobj,
 
 define_one_global_ro(sampling_rate_min);
 
-/* cpufreq_ondemandX Governor Tunables */
+/* cpufreq_ondemandx Governor Tunables */
 #define show_one(file_name, object)					\
 static ssize_t show_##file_name						\
 (struct kobject *kobj, struct attribute *attr, char *buf)              \
@@ -399,7 +399,7 @@ static ssize_t store_powersave_bias(struct kobject *a, struct attribute *b,
 		input = 1000;
 
 	dbs_tuners_ins.powersave_bias = input;
-	ondemandX_powersave_bias_init();
+	ondemandx_powersave_bias_init();
 	return count;
 }
 
@@ -423,7 +423,7 @@ static struct attribute *dbs_attributes[] = {
 
 static struct attribute_group dbs_attr_group = {
 	.attrs = dbs_attributes,
-	.name = "ondemandX",
+	.name = "ondemandx",
 };
 
 /************************** sysfs end ************************/
@@ -509,7 +509,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		}
 
 		/*
-		 * For the purpose of ondemandX, waiting for disk IO is an
+		 * For the purpose of ondemandx, waiting for disk IO is an
 		 * indication that you're performance critical, and not that
 		 * the system is actually idle. So subtract the iowait time
 		 * from the cpu idle time.
@@ -691,7 +691,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 		this_dbs_info->cpu = cpu;
 		this_dbs_info->rate_mult = 1;
-		ondemandX_powersave_bias_init_cpu(cpu);
+		ondemandx_powersave_bias_init_cpu(cpu);
 		/*
 		 * Start the timerschedule work, when this governor
 		 * is used for first time
@@ -722,8 +722,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		mutex_init(&this_dbs_info->timer_mutex);
 		dbs_timer_init(this_dbs_info);
-                register_early_suspend(&ondemandX_power_suspend);
-                pr_info("[imoseyon] ondemandX active\n");
+                register_early_suspend(&ondemandx_power_suspend);
+                pr_info("[imoseyon] ondemandx active\n");
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -736,8 +736,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (!dbs_enable)
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
-                unregister_early_suspend(&ondemandX_power_suspend);
-                pr_info("[imoseyon] ondemandX inactive\n");
+                unregister_early_suspend(&ondemandx_power_suspend);
+                pr_info("[imoseyon] ondemandx inactive\n");
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
@@ -779,20 +779,20 @@ static int __init cpufreq_gov_dbs_init(void)
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
-        pr_info("[imoseyon] ondemandX enter\n");
-	return cpufreq_register_governor(&cpufreq_gov_ondemandX);
+        pr_info("[imoseyon] ondemandx enter\n");
+	return cpufreq_register_governor(&cpufreq_gov_ondemandx);
 }
 
 static void __exit cpufreq_gov_dbs_exit(void)
 {
-        pr_info("[imoseyon] ondemandX exit\n");
-	cpufreq_unregister_governor(&cpufreq_gov_ondemandX);
+        pr_info("[imoseyon] ondemandx exit\n");
+	cpufreq_unregister_governor(&cpufreq_gov_ondemandx);
 }
 
 
 MODULE_AUTHOR("Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>");
 MODULE_AUTHOR("Alexey Starikovskiy <alexey.y.starikovskiy@intel.com>");
-MODULE_DESCRIPTION("'cpufreq_ondemandX' - A dynamic cpufreq governor for "
+MODULE_DESCRIPTION("'cpufreq_ondemandx' - A dynamic cpufreq governor for "
 	"Low Latency Frequency Transition capable processors");
 MODULE_LICENSE("GPL");
 

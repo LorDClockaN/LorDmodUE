@@ -91,7 +91,7 @@ config CPU_FREQ_DEFAULT_GOV_USERSPACE
 	  to enable the userspace governor manually.
 
 config CPU_FREQ_DEFAULT_GOV_ONDEMANDX
-	bool "ondemandX"
+	bool "ondemandx"
 	select CPU_FREQ_GOV_ONDEMANDX
 	select CPU_FREQ_GOV_PERFORMANCE
 	help
