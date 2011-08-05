@@ -126,6 +126,7 @@ struct cm3628_platform_data {
 	uint8_t ps_adc_offset2;
 	uint8_t ps_debounce;
 	uint16_t ps_delay_time;
+	uint8_t ps_reset_thd;
 };
 
 #endif
