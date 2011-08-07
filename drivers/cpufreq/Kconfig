@@ -253,4 +253,12 @@ config CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER
     Sampling latency rate multiplied by the cpu switch latency.
     Affects governor polling.
 
+config VDD_USERSPACE
+	bool "VDD sysfs interface"
+	default n
+	depends on CPU_FREQ_STAT
+	depends on ARCH_MSM7X30
+	help
+	 exposes the VDD table to userspace
+
 endif	# CPU_FREQ

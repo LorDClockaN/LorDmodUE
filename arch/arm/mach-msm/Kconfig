@@ -1374,7 +1374,6 @@ config MSM_CPU_FREQ_ONDEMAND_MIN
 	int "Min"
 	default 245760
 
-
 config MSM_HW3D
 	tristate "MSM Hardware 3D Register Driver"
 	depends on EARLYSUSPEND
@@ -1763,11 +1762,6 @@ config ACPUCLOCK_OVERCLOCKING
 	default n
 	depends on CPU_FREQ && !PERFLOCK
 	depends on ARCH_MSM7X30
-
-config JESUS_PHONE
-        bool "Enable support for unstable CPU frequencies"
-        default n
-        depends on ACPUCLOCK_OVERCLOCKING
 
 config HTC_SMEM_MSMC1C2_DEBUG
 	bool "MSMC1/MSMC2 shared memory debug"
