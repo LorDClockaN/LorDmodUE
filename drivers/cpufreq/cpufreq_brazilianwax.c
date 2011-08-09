@@ -116,7 +116,7 @@ static unsigned int threshold_freq;
 #define DEFAULT_AWAKE_MIN_FREQ 122000
 static unsigned int awake_min_freq;
 
-static unsigned int suspendfreq = 400000;
+static unsigned int suspendfreq = 384000;
 
 /*
  * Sampling rate, I highly recommend to leave it at 2.
@@ -128,7 +128,7 @@ static unsigned int sample_rate_jiffies;
  * Minimum Freqeuncy delta when ramping up.
  * zero disables and causes to always jump straight to max frequency.
  */
-#define DEFAULT_RAMP_UP_STEP 384000
+#define DEFAULT_RAMP_UP_STEP 460800
 static unsigned int ramp_up_step;
 
 /*
@@ -152,7 +152,7 @@ static unsigned long x_cpu_load;
  */
 #define DEFAULT_MIN_CPU_LOAD 35
 static unsigned long min_cpu_load;
-#define RAPID_MIN_CPU_LOAD 20
+#define RAPID_MIN_CPU_LOAD 10
 static unsigned long rapid_min_cpu_load;
 
 
