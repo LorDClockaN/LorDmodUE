@@ -356,7 +356,7 @@ static void cpufreq_brazilianwax_freq_change_time_work(struct work_struct *work)
                                   new_freq = policy->cur - ramp_down_step;
                         } else {
                                 cpu_load += 100 - max_cpu_load; // dummy load.
-                                new_freq = policy->cur * cpu_load / 100;
+                                new_freq = policy->cur * cpu_load / 73;
                         }
                         relation = CPUFREQ_RELATION_L;
                 }
