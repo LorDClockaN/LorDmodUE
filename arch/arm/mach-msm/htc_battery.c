@@ -1714,6 +1714,10 @@ static int handle_battery_call(struct msm_rpc_server *server,
 		struct rpc_batt_mtoa_set_charging_args *args;
 		args = (struct rpc_batt_mtoa_set_charging_args *)(req + 1);
 		args->enable = be32_to_cpu(args->enable);
+
+		// force slow charge when level > 94
+		if (htc_batt_info.rep.level > 94) args->enable = 1;
+
 		if (htc_batt_debug_mask & HTC_BATT_DEBUG_M2A_RPC)
 			BATT_LOG("M2A_RPC: set_charging: %d", args->enable);
 		if (htc_batt_info.charger == SWITCH_CHARGER_TPS65200)
@@ -1750,6 +1754,12 @@ static int handle_battery_call(struct msm_rpc_server *server,
 		if (htc_batt_debug_mask & HTC_BATT_DEBUG_M2A_RPC)
 			BATT_LOG("M2A_RPC: level_update: %d", args->level);
 		htc_battery_status_update(args->level);
+		
+		// at 95% switch to slow charge
+		if (htc_batt_info.rep.charging_source != 1 && args->level > 94
+			&& args->level < 98)
+			tps_set_charger_ctrl(1);
+
 		return 0;
 	}
 	default:
