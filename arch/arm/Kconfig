@@ -946,10 +946,6 @@ config ARM_TIMER_SP804
 
 source arch/arm/mm/Kconfig
 
-config DONT_RESERVE_FROM_MOVABLE_ZONE
-	def_bool y
-	depends on MEMORY_HOTPLUG
-
 config RESERVE_FIRST_PAGE
 	bool
 	default n
@@ -1353,7 +1349,8 @@ config ARCH_MEMORY_REMOVE
 	depends on MEMORY_HOTPLUG
 
 config DONT_RESERVE_FROM_MOVABLE_ZONE
-	def_bool n
+	def_bool y
+	depends on MEMORY_HOTPLUG
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
