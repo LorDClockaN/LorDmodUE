@@ -19,6 +19,7 @@ make -j`grep 'processor' /proc/cpuinfo | wc -l`
 
 cp $KERNEL_SRC/arch/arm/boot/zImage $KERNEL_SRC/releasetools/kernel/
 cp $KERNEL_SRC/drivers/net/wireless/bcm4329/bcm4329.ko $KERNEL_SRC/releasetools/system/lib/modules/
+cp $KERNEL_SRC/arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko $KERNEL_SRC/releasetools/system/lib/modules/
 cd $KERNEL_SRC/releasetools
 rm -f *.zip
 zip -r TalonMSM_7x30-$VERSION.zip *

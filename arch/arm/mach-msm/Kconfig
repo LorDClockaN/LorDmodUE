@@ -1,5 +1,11 @@
 if ARCH_MSM
 
+config 2WCR
+	bool "2 Way Call Recording"
+	default y
+	help
+	  Enables 2 Way Call Recording patch to be implemented"
+
 choice
 	prompt "Qualcomm MSM SoC Type"
 	default ARCH_MSM7X00A

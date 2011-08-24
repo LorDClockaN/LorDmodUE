@@ -113,6 +113,7 @@ struct audpreproc_afe_cmd_audio_record_cfg_done {
 	unsigned short stream_id;
 } __attribute__((packed));
 
+#ifdef CONFIG_2WCR
 /*
  * Message to indicate Routing mode
  * configuration success or failure
@@ -136,6 +137,7 @@ struct audreproc_cmd_pcm_cfg_arm_to_preproc_done {
         unsigned short stream_id;
         unsigned short configuration;
 } __attribute__((packed));
+#endif
 
 #define ADSP_MESSAGE_ID 0xffff
 #endif /* QDSP5AUDPREPROCMSG_H */

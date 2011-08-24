@@ -727,8 +727,10 @@ static int voice_thread(void *data)
 						rc = voice_cmd_device_info(v);
 						rc = voice_cmd_acquire_done(v);
 						v->voc_state = VOICE_ACQUIRE;
+#ifdef CONFIG_2WCR
                                                 broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                                         VOICE_STATE_INCALL, SESSION_IGNORE);
+#endif
 						pr_aud_info("voc_state -> VOICE_ACQUIRE\n");
 					} else {
 						pr_aud_info("start waiting for "
@@ -744,15 +746,19 @@ static int voice_thread(void *data)
 							atomic_dec(&v->rel_start_flag);
 							msm_snddev_withdraw_freq(0,
 								SNDDEV_CAP_TX, AUDDEV_CLNT_VOC);
+#ifdef CONFIG_2WCR
                                                         broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                                                 VOICE_STATE_OFFCALL, SESSION_IGNORE);
+#endif
 						} else {
 							voice_change_sample_rate(v);
 							rc = voice_cmd_device_info(v);
 							rc = voice_cmd_acquire_done(v);
 							v->voc_state = VOICE_ACQUIRE;
+#ifdef CONFIG_2WCR
                                                         broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                                                 VOICE_STATE_INCALL, SESSION_IGNORE);
+#endif
 							pr_aud_info("voc_state -> VOICE_ACQUIRE\n");
 						}
 					}
@@ -776,8 +782,10 @@ static int voice_thread(void *data)
 					pr_aud_info("voc_state -> VOICE_RELEASE\n");
 					msm_snddev_withdraw_freq(0, SNDDEV_CAP_TX,
 						AUDDEV_CLNT_VOC);
+#ifdef CONFIG_2WCR
                                         broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                                 VOICE_STATE_OFFCALL,SESSION_IGNORE);
+#endif
 				} else {
 					/* wait for the dev_state = RELEASE */
 					pr_aud_info("start waiting for "
@@ -793,8 +801,10 @@ static int voice_thread(void *data)
 					pr_aud_info("voc_state -> VOICE_RELEASE\n");
 					msm_snddev_withdraw_freq(0, SNDDEV_CAP_TX,
 						AUDDEV_CLNT_VOC);
+#ifdef CONFIG_2WCR
                                         broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                                 VOICE_STATE_OFFCALL,SESSION_IGNORE);
+#endif
 				}
 				if (atomic_read(&v->rel_start_flag))
 					atomic_dec(&v->rel_start_flag);
@@ -803,6 +813,10 @@ static int voice_thread(void *data)
 				if (v->voc_state == VOICE_ACQUIRE) {
 					v->voc_state = VOICE_CHANGE;
 					pr_aud_info("voc_state -> VOICE_CHANGE\n");
+#ifdef CONFIG_2WCR
+                                broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
+                                        VOICE_STATE_INCALL, SESSION_IGNORE);
+#endif
 				} else
 					MM_AUD_ERR("Get VOICE_CHANGE_START "
 					       "at wrong voc_state %d\n", v->voc_state);
@@ -839,8 +853,10 @@ static int voice_thread(void *data)
 				/* update voice state */
 				v->voc_state = VOICE_ACQUIRE;
 				pr_aud_info("voc_state -> VOICE_ACQUIRE\n");
+#ifdef CONFIG_2WCR
                                 broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
                                         VOICE_STATE_INCALL, SESSION_IGNORE);
+#endif
 			} else {
 				MM_AUD_ERR("Get DEV_CHANGE_READY "
 					"at the wrong voc_state %d\n", v->voc_state);

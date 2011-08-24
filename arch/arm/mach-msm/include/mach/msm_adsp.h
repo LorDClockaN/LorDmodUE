@@ -57,8 +57,12 @@ int msm_adsp_write(struct msm_adsp_module *module,
 		   unsigned queue_id,
 		   void *data, size_t len);
 
+#ifndef CONFIG_2WCR
+#define ADSP_MESSAGE_ID -1
+#else
 #if 0
 #define ADSP_MESSAGE_ID -1
+#endif
 #endif
 
 #if 1

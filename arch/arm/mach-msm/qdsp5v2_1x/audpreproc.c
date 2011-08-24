@@ -181,6 +181,7 @@ static void audpreproc_dsp_event(void *data, unsigned id, size_t len,
 			&record_cfg_done);
 		break;
 	}
+#ifdef CONFIG_2WCR
 	case AUDPREPROC_CMD_ROUTING_MODE_DONE_MSG: {
 		struct audpreproc_cmd_routing_mode_done  routing_mode_done;
 
@@ -195,6 +196,7 @@ static void audpreproc_dsp_event(void *data, unsigned id, size_t len,
 			&routing_mode_done);
 		break;
 	}
+#endif
 	case ADSP_MESSAGE_ID:
 		pr_aud_info("audpreproc: enable/disable done\n");
 		break;
