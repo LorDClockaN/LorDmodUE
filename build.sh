@@ -1,0 +1,33 @@
+# Script to build TalonMSM 7x30 kernel source
+# Created by eXistZ
+
+
+VERSION="v1.01"
+KERNEL_SRC="/usr/src/htc-kernel-msm7x30"
+
+# Linaro Android 4.5 (GCC 4.5.4) toolchain - http://www.linaro.org
+export CROSS_COMPILE="/opt/toolchains/android-toolchain-eabi-4.5/bin/arm-eabi-"
+
+export ARCH=arm
+export LOCALVERSION="-TalonMSM_7x30-$VERSION"
+
+START=$(date +%s)
+
+make talon_msm7230_defconfig
+
+make -j`grep 'processor' /proc/cpuinfo | wc -l`
+
+cp $KERNEL_SRC/arch/arm/boot/zImage $KERNEL_SRC/releasetools/kernel/
+cp $KERNEL_SRC/drivers/net/wireless/bcm4329/bcm4329.ko $KERNEL_SRC/releasetools/system/lib/modules/
+cd $KERNEL_SRC/releasetools
+rm -f *.zip
+zip -r TalonMSM_7x30-$VERSION.zip *
+
+END=$(date +%s)
+ELAPSED=$((END - START))
+E_MIN=$((ELAPSED / 60))
+E_SEC=$((ELAPSED - E_MIN * 60))
+printf "Elapsed: "
+[ $E_MIN != 0 ] && printf "%d min(s) " $E_MIN
+printf "%d sec(s)\n" $E_SEC
+echo "Finished."
