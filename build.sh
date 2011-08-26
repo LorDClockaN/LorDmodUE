@@ -9,7 +9,7 @@ KERNEL_SRC="/usr/src/htc-kernel-msm7x30"
 export CROSS_COMPILE="/opt/toolchains/android-toolchain-eabi-4.5/bin/arm-eabi-"
 
 export ARCH=arm
-export LOCALVERSION="-TalonMSM_7x30-$VERSION"
+export LOCALVERSION="-TalonACE_7x30-$VERSION"
 
 START=$(date +%s)
 
@@ -22,7 +22,7 @@ cp $KERNEL_SRC/drivers/net/wireless/bcm4329/bcm4329.ko $KERNEL_SRC/releasetools/
 cp $KERNEL_SRC/arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko $KERNEL_SRC/releasetools/system/lib/modules/
 cd $KERNEL_SRC/releasetools
 rm -f *.zip
-zip -r TalonMSM_7x30-$VERSION.zip *
+zip -r TalonACE_7x30-$VERSION.zip *
 
 END=$(date +%s)
 ELAPSED=$((END - START))
