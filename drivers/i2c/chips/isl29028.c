@@ -1448,7 +1448,7 @@ static ssize_t ps_kadc_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(ps_kadc, 0664, ps_kadc_show, ps_kadc_store);
+static DEVICE_ATTR(ps_kadc, 0666, ps_kadc_show, ps_kadc_store);
 
 static ssize_t ps_polling_ignore_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
