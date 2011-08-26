@@ -469,7 +469,7 @@ free_memmap(int node, unsigned long start_pfn, unsigned long end_pfn)
 	 * Convert start_pfn/end_pfn to a struct page pointer.
 	 */
 	start_pg = pfn_to_page(start_pfn - 1) + 1;
-	end_pg = pfn_to_page(end_pfn);
+	end_pg = pfn_to_page(end_pfn - 1) + 1;
 
 	/*
 	 * Convert to physical addresses, and
@@ -510,6 +510,14 @@ static void __init free_unused_memmap_node(int node, struct meminfo *mi)
 		if (prev_bank_end && prev_bank_end < bank_start)
 			free_memmap(node, prev_bank_end, bank_start);
 
+#ifdef CONFIG_SPARSEMEM
+		/*
+		 * Take care not to free memmap entries that don't exist
+		 * due to SPARSEMEM sections which aren't present.
+		 */
+		bank_start = min(bank_start,
+				 ALIGN(prev_bank_end, PAGES_PER_SECTION));
+#endif
 		/*
 		 * Align up here since the VM subsystem insists that the
 		 * memmap entries are valid from the bank end aligned to
@@ -517,6 +525,12 @@ static void __init free_unused_memmap_node(int node, struct meminfo *mi)
 		 */
 		prev_bank_end = ALIGN(bank_pfn_end(bank), MAX_ORDER_NR_PAGES);
 	}
+
+#ifdef CONFIG_SPARSEMEM
+	if (!IS_ALIGNED(prev_bank_end, PAGES_PER_SECTION))
+		free_memmap(prev_bank_end,
+			    ALIGN(prev_bank_end, PAGES_PER_SECTION));
+#endif
 }
 
 /*
