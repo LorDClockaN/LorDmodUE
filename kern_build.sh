@@ -9,7 +9,7 @@ cpuinfo=$(grep -i processor /proc/cpuinfo | wc -l)
 git_ver=$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/*\s//g')
 obj_dir="../build/${git_ver}/obj"
 finished="../build/${git_ver}/finished"
-def_config=lordmoduebfs_defconfig
+def_config=lordmodaufs_defconfig
 
 die() {
     echo -e "\033[1;30m>\033[0;31m>\033[1;31m> ERROR:\033[0m ${@}" && exit 1
@@ -27,10 +27,10 @@ config_kernel ()
 {
 	einfo "Configure kernel"
 	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize' \
+		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block' \
 		O=${obj_dir} $def_config
 	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize' \
+		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block' \
 		O=${obj_dir} menuconfig
 	die "Interrupt compile"
 }
@@ -38,11 +38,11 @@ config_kernel ()
 compile_kernel () {
 	einfo "Compile kernel"
 	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize' \
+		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block' \
 		O=${obj_dir} zImage 2>&1 | tee ${obj_dir}/kern.log || die "Compile kernel error"
 	einfo "Compile modules"
 	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorizeine' \
+		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorizeine -floop-interchange -floop-strip-mine -floop-block' \
 		O=${obj_dir} modules 2>&1 | tee ${obj_dir}/kern.log || die "Compile module error"
 }
 
@@ -50,7 +50,7 @@ install_kernel () {
 	einfo  "Install modules"
 	rm -fr ../build/install
 	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize' \
+		EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block' \
 		O=${obj_dir} modules_install INSTALL_MOD_PATH=../install 2>&1 >/dev/null
 
 	einfo "Install packages"
