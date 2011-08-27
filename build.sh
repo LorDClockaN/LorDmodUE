@@ -15,14 +15,30 @@ START=$(date +%s)
 
 make talon_msm7230_defconfig
 
-make -j`grep 'processor' /proc/cpuinfo | wc -l`
+if [ -e ./releasetools/system/lib/modules ]; then
+ rm -rf ./releasetools/system/lib/modules
+fi
 
+mkdir ./releasetools/system/lib/modules
+
+export INSTALL_MOD_PATH=./mod_inst
+make modules -j`grep 'processor' /proc/cpuinfo | wc -l`
+make modules_install
+
+for i in `find mod_inst -name "*.ko"`; do
+ cp $i ./releasetools/system/lib/modules/
+done
+
+rm -rf ./mod_inst
+
+make -j`grep 'processor' /proc/cpuinfo | wc -l`
 cp $KERNEL_SRC/arch/arm/boot/zImage $KERNEL_SRC/releasetools/kernel/
-cp $KERNEL_SRC/drivers/net/wireless/bcm4329/bcm4329.ko $KERNEL_SRC/releasetools/system/lib/modules/
-cp $KERNEL_SRC/arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko $KERNEL_SRC/releasetools/system/lib/modules/
 cd $KERNEL_SRC/releasetools
 rm -f *.zip
 zip -r TalonACE_7x30-$VERSION.zip *
+rm $KERNEL_SRC/releasetools/kernel/zImage
+
+cd $KERNEL_SRC
 
 END=$(date +%s)
 ELAPSED=$((END - START))
