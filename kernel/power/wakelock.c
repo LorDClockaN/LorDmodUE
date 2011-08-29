@@ -49,6 +49,13 @@ struct wake_lock main_wake_lock;
 struct wake_lock no_suspend_wake_lock;
 suspend_state_t requested_suspend_state = PM_SUSPEND_MEM;
 static struct wake_lock unknown_wakeup;
+static struct wake_lock suspend_backoff_lock;
+
+#define SUSPEND_BACKOFF_FAILURES	10
+#define SUSPEND_BACKOFF_INTERVAL	5000
+
+static unsigned suspend_backoff_count;
+static unsigned suspend_fail_count;
 
 #ifdef CONFIG_WAKELOCK_STAT
 static struct wake_lock deleted_wake_locks;
@@ -265,10 +272,20 @@ long has_wake_lock(int type)
 void sys_sync_debug(void);
 #endif
 
+static void suspend_backoff(void)
+{
+	pr_info("suspend: too many immediate wakeups, back off\n");
+	++suspend_backoff_count;
+	wake_lock_timeout(&suspend_backoff_lock,
+			  msecs_to_jiffies(suspend_backoff_count *
+					   SUSPEND_BACKOFF_INTERVAL));
+}
+
 static void suspend(struct work_struct *work)
 {
 	int ret;
 	int entry_event_num;
+	struct timespec ts_entry, ts_exit;
 
 	pr_info("[R] suspend start\n");
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
@@ -287,17 +304,30 @@ static void suspend(struct work_struct *work)
 
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("suspend: enter suspend\n");
+	getnstimeofday(&ts_entry);
 	ret = pm_suspend(requested_suspend_state);
+	getnstimeofday(&ts_exit);
 	if (debug_mask & DEBUG_EXIT_SUSPEND) {
-		struct timespec ts;
 		struct rtc_time tm;
-		getnstimeofday(&ts);
-		rtc_time_to_tm(ts.tv_sec, &tm);
+		rtc_time_to_tm(ts_exit.tv_sec, &tm);
 		pr_info("suspend: exit suspend, ret = %d "
 			"(%d-%02d-%02d %02d:%02d:%02d.%09lu UTC)\n", ret,
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
+			tm.tm_hour, tm.tm_min, tm.tm_sec, ts_exit.tv_nsec);
 	}
+
+	if (ts_exit.tv_sec - ts_entry.tv_sec <= 1) {
+		++suspend_fail_count;
+
+		if (suspend_fail_count == SUSPEND_BACKOFF_FAILURES) {
+			suspend_backoff();
+			suspend_fail_count = 0;
+		}
+	} else {
+		suspend_fail_count = 0;
+		suspend_backoff_count = 0;
+	}
+
 	if (current_event_num == entry_event_num) {
 		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("suspend: pm_suspend returned with no event\n");
@@ -565,6 +595,8 @@ static int __init wakelocks_init(void)
 	wake_lock_init(&main_wake_lock, WAKE_LOCK_SUSPEND, "main");
 	wake_lock(&main_wake_lock);
 	wake_lock_init(&unknown_wakeup, WAKE_LOCK_SUSPEND, "unknown_wakeups");
+	wake_lock_init(&suspend_backoff_lock, WAKE_LOCK_SUSPEND,
+		       			"suspend_backoff");
 	wake_lock_init(&no_suspend_wake_lock, WAKE_LOCK_SUSPEND,
 					"no_suspend_wake_lock");
 
@@ -596,6 +628,7 @@ err_suspend_work_queue:
 err_platform_driver_register:
 	platform_device_unregister(&power_device);
 err_platform_device_register:
+	wake_lock_destroy(&suspend_backoff_lock);
 	wake_lock_destroy(&no_suspend_wake_lock);
 	wake_lock_destroy(&unknown_wakeup);
 	wake_lock_destroy(&main_wake_lock);
@@ -613,6 +646,7 @@ static void  __exit wakelocks_exit(void)
 	destroy_workqueue(suspend_work_queue);
 	platform_driver_unregister(&power_driver);
 	platform_device_unregister(&power_device);
+	wake_lock_destroy(&suspend_backoff_lock);
 	wake_lock_destroy(&no_suspend_wake_lock);
 	wake_lock_destroy(&unknown_wakeup);
 	wake_lock_destroy(&main_wake_lock);
