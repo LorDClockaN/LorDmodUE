@@ -858,6 +858,7 @@ static int __init cpufreq_gov_dbs_init(void)
 		 * timer might skip some samples if idle/sleeping as needed.
 		*/
 		min_sampling_rate = MICRO_FREQUENCY_MIN_SAMPLE_RATE;
+		
 	} else {
 		/* For correct statistics, we need 10 ticks for each measure */
 		min_sampling_rate =
