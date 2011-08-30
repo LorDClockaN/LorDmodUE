@@ -376,7 +376,6 @@ int battery_charging_ctrl(enum batt_ctl_t ctl)
 		BATT_LOG("charger OFF");
 		/* 0 for enable; 1 disable */
 		result = gpio_direction_output(htc_batt_info.gpio_mchg_en_n, 1);
-		htc_batt_info.rep.force_high_power_charging = FALSE;
 		break;
 	case ENABLE_SLOW_CHG:
 		if (!htc_batt_info.rep.force_high_power_charging) {
@@ -1990,6 +1989,7 @@ static int __init htc_battery_init(void)
 	batt_register_client(&batt_notify);
 	/* Jay, The msm_fb need to consult htc_battery for power policy */
 	display_notifier(htc_power_policy, NOTIFY_POWER);
+	htc_batt_info.rep.force_high_power_charging = TRUE;
 	return 0;
 }
 
