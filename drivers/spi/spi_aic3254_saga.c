@@ -14,10 +14,6 @@
  *
  */
 
-#ifdef CONFIG_MACH_SAGA
-#include "spi_aic3254_saga.c"
-#else
-
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/miscdevice.h>
@@ -29,7 +25,6 @@
 #include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/wakelock.h>
-#include <linux/rtc.h>
 
 static struct spi_device *codec_dev;
 static struct mutex lock;
@@ -37,28 +32,23 @@ static int aic3254_opend;
 static struct _CODEC_SPI_CMD **aic3254_uplink;
 static struct _CODEC_SPI_CMD **aic3254_downlink;
 static struct _CODEC_SPI_CMD **aic3254_minidsp;
-static uint8_t *bulk_tx;
 static int suspend_flag;
 static int aic3254_rx_mode;
 static int aic3254_tx_mode;
 static struct aic3254_ctl_ops default_ctl_ops;
 static struct aic3254_ctl_ops *ctl_ops = &default_ctl_ops;
-spinlock_t	spinlock;
 
 struct ecodec_aic3254_state {
 	int enabled;
 	struct clk *rx_mclk;
 	struct clk *rx_sclk;
 	struct wake_lock idlelock;
-	struct wake_lock wakelock;
 };
 static struct ecodec_aic3254_state codec_clk;
 
 /* function prototype */
 int route_tx_enable(int, int);
 int route_rx_enable(int, int);
-static void spi_aic3254_prevent_sleep(void);
-static void spi_aic3254_allow_sleep(void);
 
 void aic3254_register_ctl_ops(struct aic3254_ctl_ops *ops)
 {
@@ -97,32 +87,6 @@ static int codec_spi_read(unsigned char addr, unsigned char *data)
 	return 0;
 }
 
-static int32_t spi_write_table(CODEC_SPI_CMD *cmds, int num)
-{
-	int i;
-	int status = 0;
-	struct spi_message	m;
-	struct spi_transfer	tx_addr;
-	spi_message_init(&m);
-	memset(bulk_tx, 0, MINIDSP_COL_MAX * 2 * sizeof(uint8_t));
-	memset(&tx_addr, 0, sizeof(struct spi_transfer));
-
-	for (i = 0; i < num ; i++) {
-		bulk_tx[i * 2] = cmds[i].reg << 1;
-		bulk_tx[i *2 + 1] = cmds[i].data;
-	}
-	tx_addr.tx_buf = bulk_tx;
-	tx_addr.len = num * 2;
-	tx_addr.cs_change = 1;
-	tx_addr.bits_per_word = 16;
-	spi_message_add_tail(&tx_addr, &m);
-	if (codec_dev == NULL)
-		status = -ESHUTDOWN;
-	else
-		status = spi_sync(codec_dev, &m);
-	return status;
-}
-
 static int aic3254_config(CODEC_SPI_CMD *cmds, int size)
 {
 	int i, retry, ret;
@@ -139,7 +103,8 @@ static int aic3254_config(CODEC_SPI_CMD *cmds, int size)
 	if (cmds == NULL) {
 		pr_aud_err("%s: invalid spi parameters\n", __func__);
 		return -EINVAL;
-	}
+	} else
+		pr_aud_info("%s: size = %d\n", __func__, size);
 
 	/* when LCM power is off, spi transmission would fail sometime */
 	if (suspend_flag && ctl_ops->panel_sleep_in) {
@@ -153,40 +118,35 @@ static int aic3254_config(CODEC_SPI_CMD *cmds, int size)
 			pr_aud_info("%s: success on invoking panel_sleep_in\n"
 				, __func__);
 	}
-	/* large dsp image use bulk mode to transfer */
-        /* avoid to bulk transfer on spi use ext_gpio_cs project */
-	if (size < 1000 || codec_dev->ext_gpio_cs != 0) {
-		for (i = 0; i < size; i++) {
-			switch (cmds[i].act) {
-			case 'w':
-				codec_spi_write(cmds[i].reg, cmds[i].data);
-				break;
-			case 'r':
-				for (retry = AIC3254_MAX_RETRY; retry > 0; retry--) {
-					ret = codec_spi_read(cmds[i].reg, &data);
-					if (ret < 0)
-						pr_aud_err("%s: read fail %d, retry\n",
-							__func__, ret);
-					else if (data == cmds[i].data)
-						break;
-					hr_msleep(1);
-				}
-				if (retry <= 0)
-					pr_aud_info("3254 power down procedure"
-						" ,flag 0x%02X=0x%02X(0x%02X)\n",
-						cmds[i].reg,
-						ret, cmds[i].data);
-				break;
-			case 'd':
-				hr_msleep(cmds[i].data);
-				break;
-			default:
-				break;
+
+
+	for (i = 0; i < size; i++) {
+		switch (cmds[i].act) {
+		case 'w':
+			codec_spi_write(cmds[i].reg, cmds[i].data);
+			break;
+		case 'r':
+			for (retry = AIC3254_MAX_RETRY; retry > 0; retry--) {
+				ret = codec_spi_read(cmds[i].reg, &data);
+				if (ret < 0)
+					pr_aud_err("%s: read fail %d, retry\n",
+						__func__, ret);
+				else if (data == cmds[i].data)
+					break;
+				hr_msleep(10);
 			}
+			if (retry <= 0)
+				pr_aud_info("%s: 3254 power down procedure"
+					" ,flag 0x%02X=0x%02X(0x%02X)\n",
+					__func__, cmds[i].reg,
+					ret, cmds[i].data);
+			break;
+		case 'd':
+			hr_msleep(cmds[i].data);
+			break;
+		default:
+			break;
 		}
-	} else {
-		/* use bulk to transfer large data */
-		spi_write_table(cmds, size);
 	}
 	if (ctl_ops->spibus_enable)
 		ctl_ops->spibus_enable(0);
@@ -268,16 +228,12 @@ static void aic3254_tx_config(int mode)
 
 	if (mode != UPLINK_OFF && mode != POWER_OFF) {
 		/* uplink_Wakeup */
-		pr_aud_info("uplink wakeup len(%d)\n",
-			(aic3254_uplink[UPLINK_WAKEUP][0].data-1));
 		aic3254_config(
 			&aic3254_uplink[UPLINK_WAKEUP][1],
 			aic3254_uplink[UPLINK_WAKEUP][0].data);
 	}
 
 	/* route tx device */
-	pr_aud_info("uplink TX %d len(%d)\n", mode,
-		(aic3254_uplink[mode][0].data-1));
 	aic3254_config(&aic3254_uplink[mode][1],
 			aic3254_uplink[mode][0].data);
 }
@@ -295,44 +251,29 @@ static void aic3254_rx_config(int mode)
 
 	if (mode != DOWNLINK_OFF && mode != POWER_OFF) {
 		/* Downlink Wakeup */
-		pr_aud_info("downlink wakeup len(%d)\n",
-			(aic3254_downlink[DOWNLINK_WAKEUP][0].data-1));
 		aic3254_config(
 			&aic3254_downlink[DOWNLINK_WAKEUP][1],
 			aic3254_downlink[DOWNLINK_WAKEUP][0].data);
 	}
 
 	/* route rx device */
-	pr_aud_info("downlink RX %d len(%d)\n", mode,
-		(aic3254_downlink[mode][0].data-1));
 	aic3254_config(&aic3254_downlink[mode][1],
 				aic3254_downlink[mode][0].data);
 }
 
 static void aic3254_powerdown(void)
 {
-	int64_t t1, t2;
-#if defined(CONFIG_ARCH_MSM7X30)
 	struct ecodec_aic3254_state *drv = &codec_clk;
-#endif
-
-
 	if (aic3254_tx_mode != UPLINK_OFF || aic3254_rx_mode != DOWNLINK_OFF)
 		return;
 
-	t1 = ktime_to_ms(ktime_get());
-
-	spi_aic3254_prevent_sleep();
-	if (aic3254_uplink != NULL) {
-		pr_aud_info("power off AIC3254 len(%d)++\n",
-			(aic3254_uplink[POWER_OFF][0].data-1));
+	pr_aud_info("%s: power off AIC3254\n", __func__);
+	wake_lock(&drv->idlelock);
+	if (aic3254_uplink != NULL)
 		aic3254_config(&aic3254_uplink[POWER_OFF][1],
 				aic3254_uplink[POWER_OFF][0].data);
-	} else {
-		pr_aud_info("power off AIC3254 len(%d)++\n",
-			(ARRAY_SIZE(CODEC_POWER_OFF)));
+	else
 		aic3254_config(CODEC_POWER_OFF, ARRAY_SIZE(CODEC_POWER_OFF));
-	}
 
 #if defined(CONFIG_ARCH_MSM7X30)
 	if (drv->enabled) {
@@ -345,10 +286,7 @@ static void aic3254_powerdown(void)
 	}
 #endif
 
-	spi_aic3254_allow_sleep();
-
-	t2 = ktime_to_ms(ktime_get())-t1;
-	pr_aud_info("power off AIC3254 %lldms --\n", t2);
+	wake_unlock(&drv->idlelock);
 	return;
 }
 static void aic3254_loopback(int mode)
@@ -491,14 +429,11 @@ void aic3254_set_mic_bias(int en) {
 
 static int aic3254_set_config(int config_tbl, int idx, int en)
 {
-	int rc = 0, len = 0;
-	int64_t t1, t2;
-#if defined(CONFIG_ARCH_MSM7X30)
+	int len;
 	struct ecodec_aic3254_state *drv = &codec_clk;
-#endif
+	pr_aud_info("%s: table(0x%X) index(%d)\n", __func__, config_tbl, idx);
 
-	mutex_lock(&lock);
-	spi_aic3254_prevent_sleep();
+	wake_lock(&drv->idlelock);
 
 #if defined(CONFIG_ARCH_MSM7X30)
 	if (drv->enabled == 0) {
@@ -515,11 +450,7 @@ static int aic3254_set_config(int config_tbl, int idx, int en)
 	case AIC3254_CONFIG_TX:
 		/* TX */
 		pr_aud_info("%s: enable tx\n", __func__);
-#if defined(CONFIG_SPI_AIC3254_SELF_POWER_DOWN)
 		if (en && idx != UPLINK_OFF) {
-#else
-		if (en) {
-#endif
 			if (ctl_ops->tx_amp_enable)
 				ctl_ops->tx_amp_enable(0);
 
@@ -531,21 +462,15 @@ static int aic3254_set_config(int config_tbl, int idx, int en)
 		} else {
 			aic3254_tx_config(UPLINK_OFF);
 			aic3254_tx_mode = UPLINK_OFF;
-#if defined(CONFIG_SPI_AIC3254_SELF_POWER_DOWN)
 			if (ctl_ops->tx_amp_enable)
 				ctl_ops->tx_amp_enable(0);
 			aic3254_powerdown();
-#endif
 		}
 		break;
 	case AIC3254_CONFIG_RX:
 		/* RX */
 		pr_aud_info("%s: enable rx\n", __func__);
-#if defined(CONFIG_SPI_AIC3254_SELF_POWER_DOWN)
 		if (en && idx != DOWNLINK_OFF) {
-#else
-		if (en) {
-#endif
 			if (ctl_ops->rx_amp_enable)
 				ctl_ops->rx_amp_enable(0);
 
@@ -557,28 +482,20 @@ static int aic3254_set_config(int config_tbl, int idx, int en)
 		} else {
 			aic3254_rx_config(DOWNLINK_OFF);
 			aic3254_rx_mode = DOWNLINK_OFF;
-#if defined(CONFIG_SPI_AIC3254_SELF_POWER_DOWN)
 			if (ctl_ops->rx_amp_enable)
 				ctl_ops->rx_amp_enable(0);
 			aic3254_powerdown();
-#endif
 		}
 		break;
 	case AIC3254_CONFIG_MEDIA:
-		if (aic3254_minidsp == NULL) {
-			rc = -EFAULT;
-			break;
-		}
-
+		if (aic3254_minidsp == NULL)
+			return -EFAULT;
 		len = (aic3254_minidsp[idx][0].reg << 8)
 			| aic3254_minidsp[idx][0].data;
 
-		pr_aud_info("%s: configure miniDSP index(%d) len = %d ++\n",
-			__func__, idx, len);
+		pr_aud_info("%s: miniDSP command len = %d\n", __func__, len);
 		pr_aud_info("%s: rx mode %d, tx mode %d\n",
 			__func__, aic3254_rx_mode, aic3254_tx_mode);
-
-		t1 = ktime_to_ms(ktime_get());
 
 		if (ctl_ops->rx_amp_enable)
 			ctl_ops->rx_amp_enable(0);
@@ -596,19 +513,15 @@ static int aic3254_set_config(int config_tbl, int idx, int en)
 		if (aic3254_tx_mode != UPLINK_OFF)
 			aic3254_tx_config(aic3254_tx_mode);
 
-		t2 = ktime_to_ms(ktime_get())-t1;
-
 		if (ctl_ops->rx_amp_enable)
 			ctl_ops->rx_amp_enable(1);
 
-		pr_aud_info("%s: configure miniDSP index(%d) time: %lldms --\n",
-			__func__, idx, (t2));
+		pr_aud_info("%s: configure minidsp done\n", __func__);
 		break;
 	}
 
-	spi_aic3254_allow_sleep();
-	mutex_unlock(&lock);
-	return rc;
+	wake_unlock(&drv->idlelock);
+	return 0;
 }
 
 static int aic3254_open(struct inode *inode, struct file *pfile)
@@ -637,33 +550,28 @@ static int aic3254_release(struct inode *inode, struct file *pfile)
 
 void aic3254_set_mode(int config, int mode)
 {
+	pr_aud_info("%s: aic3254_set_mode %d mode = %d\n", __func__, config, mode);
 	mutex_lock(&lock);
-	spi_aic3254_prevent_sleep();
-
 	switch (config) {
 	case AIC3254_CONFIG_TX:
 		/* TX */
-		pr_aud_info("%s: AIC3254_CONFIG_TX mode = %d\n",
-			__func__, mode);
 		aic3254_tx_config(mode);
 		aic3254_tx_mode = mode;
 		break;
 	case AIC3254_CONFIG_RX:
 		/* RX */
-		pr_aud_info("%s: AIC3254_CONFIG_RX mode = %d\n",
-			__func__, mode);
 		aic3254_rx_config(mode);
 		if (mode == FM_OUT_SPEAKER)
 			aic3254_tx_config(FM_IN_SPEAKER);
 		else if (mode == FM_OUT_HEADSET)
 			aic3254_tx_config(FM_IN_HEADSET);
+		else if (mode == DOWNLINK_OFF && (mode == FM_OUT_HEADSET
+						|| mode == FM_OUT_HEADSET))
+			aic3254_tx_config(POWER_OFF);
 		aic3254_rx_mode = mode;
 		break;
 	}
-
 	aic3254_powerdown();
-
-	spi_aic3254_allow_sleep();
 	mutex_unlock(&lock);
 }
 
@@ -756,6 +664,7 @@ static int aic3254_ioctl(struct inode *inode, struct file *file,
 			pr_aud_err("%s: failed on copy_from_user\n", __func__);
 			return -EFAULT;
 		}
+		pr_aud_info("%s: index %d for %X\n", __func__, i, cmd);
 		ret = aic3254_set_config(cmd, i, 1);
 		if (ret < 0)
 			pr_aud_err("%s: configure(%d) error %d\n",
@@ -857,9 +766,7 @@ static int aic3254_ioctl(struct inode *inode, struct file *file,
 		}
 		break;
 	case AIC3254_POWERDOWN:
-		mutex_lock(&lock);
 		aic3254_powerdown();
-		mutex_unlock(&lock);
 		break;
 	case AIC3254_LOOPBACK:
 		if (copy_from_user(&i, (void *)argc, sizeof(int))) {
@@ -930,8 +837,6 @@ static int spi_aic3254_probe(struct spi_device *aic3254)
 	aic3254_uplink = init_2d_array(IO_CTL_ROW_MAX, IO_CTL_COL_MAX);
 	aic3254_downlink = init_2d_array(IO_CTL_ROW_MAX, IO_CTL_COL_MAX);
 	aic3254_minidsp = init_2d_array(MINIDSP_ROW_MAX, MINIDSP_COL_MAX);
-	bulk_tx = kcalloc(MINIDSP_COL_MAX * 2 , sizeof(uint8_t), GFP_KERNEL);
-	spin_lock_init(&spinlock);
 	return 0;
 }
 
@@ -969,27 +874,8 @@ static int spi_aic3254_remove(struct spi_device *aic3254)
 		kfree(aic3254_minidsp);
 		aic3254_minidsp = NULL;
 	}
-	if (bulk_tx != NULL) {
-		kfree(bulk_tx);
-		bulk_tx = NULL;
-	}
+
 	return 0;
-}
-
-static void spi_aic3254_prevent_sleep(void)
-{
-	struct ecodec_aic3254_state *codec_drv = &codec_clk;
-
-	wake_lock(&codec_drv->wakelock);
-	wake_lock(&codec_drv->idlelock);
-}
-
-static void spi_aic3254_allow_sleep(void)
-{
-	struct ecodec_aic3254_state *codec_drv = &codec_clk;
-
-	wake_unlock(&codec_drv->idlelock);
-	wake_unlock(&codec_drv->wakelock);
 }
 
 static struct spi_driver spi_aic3254 = {
@@ -1044,8 +930,6 @@ static int __init spi_aic3254_init(void)
 
 	wake_lock_init(&codec_drv->idlelock, WAKE_LOCK_IDLE,
 			"aic3254_lock");
-	wake_lock_init(&codec_drv->wakelock, WAKE_LOCK_SUSPEND,
-			"aic3254_suspend_lock");
 
 	return 0;
 }
@@ -1053,13 +937,12 @@ module_init(spi_aic3254_init);
 
 static void __exit spi_aic3254_exit(void)
 {
+#if defined(CONFIG_ARCH_MSM7X30)
 	struct ecodec_aic3254_state *codec_drv =  &codec_clk;
+#endif
 
 	spi_unregister_driver(&spi_aic3254);
 	misc_deregister(&aic3254_misc);
-
-	wake_lock_destroy(&codec_drv->wakelock);
-	wake_lock_destroy(&codec_drv->idlelock);
 
 #if defined(CONFIG_ARCH_MSM7X30)
 	clk_put(codec_drv->rx_mclk);
@@ -1070,5 +953,3 @@ static void __exit spi_aic3254_exit(void)
 module_exit(spi_aic3254_exit);
 
 MODULE_LICENSE("GPL");
-
-#endif
