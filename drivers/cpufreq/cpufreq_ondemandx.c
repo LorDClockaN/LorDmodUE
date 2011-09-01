@@ -53,7 +53,7 @@
 
 static unsigned int min_sampling_rate;
 
-static unsigned int suspendfreq = 345000;
+static unsigned int suspendfreq = 345600;
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
