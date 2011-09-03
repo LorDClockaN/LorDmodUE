@@ -22,7 +22,6 @@
 #include <linux/tick.h>
 #include <linux/ktime.h>
 #include <linux/sched.h>
-#include <linux/earlysuspend.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -52,8 +51,6 @@
 #define MIN_SAMPLING_RATE_RATIO			(2)
 
 static unsigned int min_sampling_rate;
-
-static unsigned int suspendfreq = 998400;
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
@@ -99,40 +96,7 @@ struct cpu_dbs_info_s {
 };
 static DEFINE_PER_CPU(struct cpu_dbs_info_s, od_cpu_dbs_info);
 
-static unsigned int dbs_enable=0;	/* number of CPUs using this policy */
-
-// used for imoseyon's mods
-static unsigned int suspended = 0;
-static void ondemand_suspend(int suspend)
-{
-        struct cpu_dbs_info_s *dbs_info = &per_cpu(od_cpu_dbs_info, smp_processor_id());
-        if (dbs_enable==0) return;
-        if (!suspend) { // resume at max speed:
-                suspended = 0;
-                __cpufreq_driver_target(dbs_info->cur_policy, dbs_info->cur_policy->max, 
-			CPUFREQ_RELATION_L);
-                pr_info("[imoseyon] ondemand awake at %d\n", dbs_info->cur_policy->cur);
-        } else {
-                suspended = 1;
-		// let's give it a little breathing room
-                __cpufreq_driver_target(dbs_info->cur_policy, suspendfreq, CPUFREQ_RELATION_H);
-                pr_info("[imoseyon] ondemand suspended at %d\n", dbs_info->cur_policy->cur);
-        }
-}
-
-static void ondemand_early_suspend(struct early_suspend *handler) {
-       ondemand_suspend(1);
-}
-
-static void ondemand_late_resume(struct early_suspend *handler) {
-       ondemand_suspend(0);
-}
-
-static struct early_suspend ondemand_power_suspend = {
-        .suspend = ondemand_early_suspend,
-        .resume = ondemand_late_resume,
-        .level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
-};
+static unsigned int dbs_enable;	/* number of CPUs using this policy */
 
 /*
  * dbs_mutex protects dbs_enable in governor start/stop.
@@ -460,12 +424,9 @@ static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
 		freq = powersave_bias_target(p, freq, CPUFREQ_RELATION_H);
 	else if (p->cur == p->max)
 		return;
-	if (suspended && freq > suspendfreq) {
-	     freq = suspendfreq;
-	     __cpufreq_driver_target(p, freq, CPUFREQ_RELATION_H);
-	} else
-	    __cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
-                        CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
+
+	__cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
+			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
 }
 
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
@@ -635,10 +596,9 @@ static void do_dbs_timer(struct work_struct *work)
 				delay -= jiffies % delay;
 		}
 	} else {
-	    if (!suspended) 
 		__cpufreq_driver_target(dbs_info->cur_policy,
 			dbs_info->freq_lo, CPUFREQ_RELATION_H);
-	    delay = dbs_info->freq_lo_jiffies;
+		delay = dbs_info->freq_lo_jiffies;
 	}
 	schedule_delayed_work_on(cpu, &dbs_info->work, delay);
 	mutex_unlock(&dbs_info->timer_mutex);
@@ -748,8 +708,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		mutex_init(&this_dbs_info->timer_mutex);
 		dbs_timer_init(this_dbs_info);
-                register_early_suspend(&ondemand_power_suspend);
-                pr_info("[imoseyon] ondemand active\n");
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -762,8 +720,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (!dbs_enable)
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
-                unregister_early_suspend(&ondemand_power_suspend);
-                pr_info("[imoseyon] ondemand inactive\n");
+
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
@@ -805,13 +762,11 @@ static int __init cpufreq_gov_dbs_init(void)
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
-        pr_info("[imoseyon] ondemand enter\n");
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
 }
 
 static void __exit cpufreq_gov_dbs_exit(void)
 {
-        pr_info("[imoseyon] ondemand exit\n");
 	cpufreq_unregister_governor(&cpufreq_gov_ondemand);
 }
 
@@ -828,3 +783,4 @@ fs_initcall(cpufreq_gov_dbs_init);
 module_init(cpufreq_gov_dbs_init);
 #endif
 module_exit(cpufreq_gov_dbs_exit);
+
