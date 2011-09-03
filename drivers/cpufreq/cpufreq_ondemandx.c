@@ -38,6 +38,7 @@
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
+#define DEF_SUSPEND_FREQ                        (384000)
 
 /*
  * The polling frequency of this governor depends on the capability of
@@ -52,8 +53,6 @@
 #define MIN_SAMPLING_RATE_RATIO			(2)
 
 static unsigned int min_sampling_rate;
-
-static unsigned int suspendfreq = 384000;
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
@@ -99,6 +98,31 @@ struct cpu_dbs_info_s {
 };
 static DEFINE_PER_CPU(struct cpu_dbs_info_s, od_cpu_dbs_info);
 
+/*
+ * dbs_mutex protects dbs_enable in governor start/stop.
+ */
+static DEFINE_MUTEX(dbs_mutex);
+
+static struct dbs_tuners {
+	unsigned int sampling_rate;
+	unsigned int up_threshold;
+	unsigned int down_differential;
+	unsigned int ignore_nice;
+	unsigned int sampling_down_factor;
+	unsigned int powersave_bias;
+	unsigned int io_is_busy;
+	unsigned int suspend_freq;
+} dbs_tuners_ins = {
+	.up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
+	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
+	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
+	.ignore_nice = 0,
+	.powersave_bias = 100,
+	.suspend_freq = DEF_SUSPEND_FREQ,
+};
+
+
+
 static unsigned int dbs_enable=0;	/* number of CPUs using this policy */
 
 // used for imoseyon's mods
@@ -115,7 +139,7 @@ static void ondemandx_suspend(int suspend)
         } else {
                 suspended = 1;
 		// let's give it a little breathing room
-                __cpufreq_driver_target(dbs_info->cur_policy, suspendfreq, CPUFREQ_RELATION_H);
+                __cpufreq_driver_target(dbs_info->cur_policy, dbs_tuners_ins.suspend_freq, CPUFREQ_RELATION_H);
                 pr_info("[imoseyon] ondemandx suspended at %d\n", dbs_info->cur_policy->cur);
         }
 }
@@ -132,27 +156,6 @@ static struct early_suspend ondemandx_power_suspend = {
         .suspend = ondemandx_early_suspend,
         .resume = ondemandx_late_resume,
         .level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
-};
-
-/*
- * dbs_mutex protects dbs_enable in governor start/stop.
- */
-static DEFINE_MUTEX(dbs_mutex);
-
-static struct dbs_tuners {
-	unsigned int sampling_rate;
-	unsigned int up_threshold;
-	unsigned int down_differential;
-	unsigned int ignore_nice;
-	unsigned int sampling_down_factor;
-	unsigned int powersave_bias;
-	unsigned int io_is_busy;
-} dbs_tuners_ins = {
-	.up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
-	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
-	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
-	.ignore_nice = 0,
-	.powersave_bias = 100,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
@@ -292,6 +295,8 @@ show_one(down_differential, down_differential);
 show_one(sampling_down_factor, sampling_down_factor);
 show_one(ignore_nice_load, ignore_nice);
 show_one(powersave_bias, powersave_bias);
+show_one(suspend_freq, suspend_freq);
+
 
 static ssize_t store_sampling_rate(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
@@ -404,6 +409,8 @@ static ssize_t store_powersave_bias(struct kobject *a, struct attribute *b,
 	return count;
 }
 
+
+
 static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
 				    const char *buf, size_t count)
 {
@@ -427,6 +434,29 @@ static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
 	return count;
 }
 
+static ssize_t store_suspend_freq(struct kobject *a, struct attribute *b,
+				    const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+
+	if (ret != 1)
+		return -EINVAL;
+
+	if (input > 2016000)
+		input = 2016000;
+
+	if (input < 122000)
+		input = 122000;
+
+	mutex_lock(&dbs_mutex);
+	dbs_tuners_ins.suspend_freq = input;
+	mutex_unlock(&dbs_mutex);
+
+	return count;
+}
+
 define_one_global_rw(sampling_rate);
 define_one_global_rw(io_is_busy);
 define_one_global_rw(up_threshold);
@@ -434,6 +464,7 @@ define_one_global_rw(down_differential);
 define_one_global_rw(sampling_down_factor);
 define_one_global_rw(ignore_nice_load);
 define_one_global_rw(powersave_bias);
+define_one_global_rw(suspend_freq);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
@@ -444,6 +475,7 @@ static struct attribute *dbs_attributes[] = {
 	&ignore_nice_load.attr,
 	&powersave_bias.attr,
 	&io_is_busy.attr,
+	&suspend_freq.attr,
 	NULL
 };
 
@@ -460,8 +492,8 @@ static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
 		freq = powersave_bias_target(p, freq, CPUFREQ_RELATION_H);
 	else if (p->cur == p->max)
 		return;
-	if (suspended && freq > suspendfreq) {
-	     freq = suspendfreq;
+	if (suspended && freq > dbs_tuners_ins.suspend_freq) {
+	     freq = dbs_tuners_ins.suspend_freq;
 	     __cpufreq_driver_target(p, freq, CPUFREQ_RELATION_H);
 	} else
 	    __cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
