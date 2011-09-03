@@ -379,7 +379,7 @@ int battery_charging_ctrl(enum batt_ctl_t ctl)
 		break;
 	case ENABLE_SLOW_CHG:
 		/* Act as ctl == DISABLE if charge_on_plug_enabled == 0 */
-		if (htc_batt_info.rep.charge_on_plug_enabled) {
+		if (!htc_batt_info.rep.charge_on_plug_enabled) {
 		  result = gpio_direction_output(htc_batt_info.gpio_mchg_en_n, 1);
 		/* Charging on usb, slow */
 		} else if (!htc_batt_info.rep.force_high_power_charging) {
