@@ -378,12 +378,17 @@ int battery_charging_ctrl(enum batt_ctl_t ctl)
 		result = gpio_direction_output(htc_batt_info.gpio_mchg_en_n, 1);
 		break;
 	case ENABLE_SLOW_CHG:
-		if (!htc_batt_info.rep.force_high_power_charging) {
+		/* Act as ctl == DISABLE if charge_on_plug_enabled == 0 */
+		if (htc_batt_info.rep.charge_on_plug_enabled) {
+		  result = gpio_direction_output(htc_batt_info.gpio_mchg_en_n, 1);
+		/* Charging on usb, slow */
+		} else if (!htc_batt_info.rep.force_high_power_charging) {
 			BATT_LOG("charger ON (SLOW)");
 			result = gpio_direction_output(htc_batt_info.gpio_iset, 0);
 			result = gpio_direction_output(htc_batt_info.gpio_mchg_en_n, 0);
 			if (htc_batt_info.gpio_adp_9v > 0)
 				result = gpio_direction_output(htc_batt_info.gpio_adp_9v, 0);
+		/* Charging on usb, fast */
 		} else {
 			BATT_LOG("charger ON (FAST)");
 			result = gpio_direction_output(htc_batt_info.gpio_iset, 1);
@@ -1125,6 +1130,7 @@ static struct device_attribute htc_battery_attrs[] = {
 	HTC_BATTERY_ATTR(full_bat),
 	HTC_BATTERY_ATTR(over_vchg),
 	HTC_BATTERY_ATTR(force_high_power_charging),
+	HTC_BATTERY_ATTR(charge_on_plug_enabled),
 /*[FIXME]__ATTR(batt_attr_raw, S_IRUGO, htc_battery_show_batt_attr, NULL),*/
 #ifdef CONFIG_HTC_BATTCHG_SMEM
 	__ATTR(smem_raw, S_IRUGO, htc_battery_show_smem, NULL),
@@ -1143,6 +1149,7 @@ enum {
 	FULL_BAT,
 	OVER_VCHG,
 	FORCE_HIGH_POWER_CHARGING,
+	CHARGE_ON_PLUG_ENABLED
 };
 
 static int htc_rpc_set_delta(unsigned delta)
@@ -1466,12 +1473,17 @@ static ssize_t htc_battery_store_property(struct device *dev,
 		htc_batt_info.rep.force_high_power_charging = (unsigned char)state;
 		i = size;
 		break;
+	case CHARGE_ON_PLUG_ENABLED:
+		htc_batt_info.rep.charge_on_plug_enabled = (unsigned char)state;
+		i = size;
+		break;
 	default:
 		i = -EINVAL;
 	}
 	mutex_unlock(&htc_batt_info.lock);
 
-	htc_batt_info.rep.force_high_power_charging = (unsigned char)state;
+	// FIXME why this again?
+	// htc_batt_info.rep.force_high_power_charging = (unsigned char)state;
 	return i;
 }
 
@@ -1538,6 +1550,10 @@ dont_need_update:
 	case FORCE_HIGH_POWER_CHARGING:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 			       htc_batt_info.rep.force_high_power_charging);
+		break;
+	case CHARGE_ON_PLUG_ENABLED:
+		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
+			       htc_batt_info.rep.charge_on_plug_enabled);
 		break;
 	default:
 		i = -EINVAL;
@@ -2000,6 +2016,7 @@ static int __init htc_battery_init(void)
 	/* Jay, The msm_fb need to consult htc_battery for power policy */
 	display_notifier(htc_power_policy, NOTIFY_POWER);
 	htc_batt_info.rep.force_high_power_charging = TRUE;
+	htc_batt_info.rep.charge_on_plug_enabled = TRUE;
 	return 0;
 }
 
