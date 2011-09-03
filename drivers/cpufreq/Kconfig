@@ -141,6 +141,12 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS
   help
     Use the CPUFreq governor 'smartass' as default.
 
+config CPU_FREQ_DEFAULT_GOV_SMARTASS2
+	bool "smartass2"
+	select CPU_FREQ_GOV_SMARTASS2
+	help
+	  Use the CPUFreq governor 'smartassV2' as default.
+
 config CPU_FREQ_DEFAULT_GOV_BRAZILIANWAX
 	bool "brazilianwax"
 	select CPU_FREQ_GOV_BRAZILIANWAX
@@ -286,6 +292,13 @@ config CPU_FREQ_GOV_SMARTASS
     'smartass' - a "smart" optimized governor for the hero!
 
     If in doubt, say N.
+
+config CPU_FREQ_GOV_SMARTASS2
+	tristate "'smartassV2' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	    'smartassV2' - a "smart" optimized governor for the hero!
+ 	
 
 config CPU_FREQ_GOV_BRAZILIANWAX
 	tristate "'brazilianwax' cpufreq governor"
