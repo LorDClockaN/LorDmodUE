@@ -57,7 +57,6 @@
 #include <linux/seq_file.h>
 #include <linux/miscdevice.h>
 #include <linux/freezer.h>
-#include <linux/smp_lock.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <scsi/scsi_cmnd.h>
@@ -1222,7 +1221,7 @@ static int pkt_start_recovery(struct packet_data *pkt)
 	pkt->bio->bi_flags = 1 << BIO_UPTODATE;
 	pkt->bio->bi_idx = 0;
 
-	BUG_ON(pkt->bio->bi_rw != REQ_WRITE);
+	BUG_ON(pkt->bio->bi_rw != (1 << BIO_RW));
 	BUG_ON(pkt->bio->bi_vcnt != pkt->frames);
 	BUG_ON(pkt->bio->bi_size != pkt->frames * CD_FRAMESIZE);
 	BUG_ON(pkt->bio->bi_end_io != pkt_end_io_packet_write);
@@ -2383,7 +2382,6 @@ static int pkt_open(struct block_device *bdev, fmode_t mode)
 
 	VPRINTK(DRIVER_NAME": entering open\n");
 
-	lock_kernel();
 	mutex_lock(&ctl_mutex);
 	pd = pkt_find_dev_from_minor(MINOR(bdev->bd_dev));
 	if (!pd) {
@@ -2411,7 +2409,6 @@ static int pkt_open(struct block_device *bdev, fmode_t mode)
 	}
 
 	mutex_unlock(&ctl_mutex);
-	unlock_kernel();
 	return 0;
 
 out_dec:
@@ -2419,7 +2416,6 @@ out_dec:
 out:
 	VPRINTK(DRIVER_NAME": failed open (%d)\n", ret);
 	mutex_unlock(&ctl_mutex);
-	unlock_kernel();
 	return ret;
 }
 
@@ -2428,7 +2424,6 @@ static int pkt_close(struct gendisk *disk, fmode_t mode)
 	struct pktcdvd_device *pd = disk->private_data;
 	int ret = 0;
 
-	lock_kernel();
 	mutex_lock(&ctl_mutex);
 	pd->refcnt--;
 	BUG_ON(pd->refcnt < 0);
@@ -2437,7 +2432,6 @@ static int pkt_close(struct gendisk *disk, fmode_t mode)
 		pkt_release_dev(pd, flush);
 	}
 	mutex_unlock(&ctl_mutex);
-	unlock_kernel();
 	return ret;
 }
 
@@ -2768,12 +2762,10 @@ out_mem:
 static int pkt_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd, unsigned long arg)
 {
 	struct pktcdvd_device *pd = bdev->bd_disk->private_data;
-	int ret;
 
 	VPRINTK("pkt_ioctl: cmd %x, dev %d:%d\n", cmd,
 		MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
 
-	lock_kernel();
 	switch (cmd) {
 	case CDROMEJECT:
 		/*
@@ -2791,16 +2783,14 @@ static int pkt_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd, 
 	case CDROM_LAST_WRITTEN:
 	case CDROM_SEND_PACKET:
 	case SCSI_IOCTL_SEND_COMMAND:
-		ret = __blkdev_driver_ioctl(pd->bdev, mode, cmd, arg);
-		break;
+		return __blkdev_driver_ioctl(pd->bdev, mode, cmd, arg);
 
 	default:
 		VPRINTK(DRIVER_NAME": Unknown ioctl for %s (%x)\n", pd->name, cmd);
-		ret = -ENOTTY;
+		return -ENOTTY;
 	}
-	unlock_kernel();
 
-	return ret;
+	return 0;
 }
 
 static int pkt_media_changed(struct gendisk *disk)
@@ -2822,7 +2812,7 @@ static const struct block_device_operations pktcdvd_ops = {
 	.owner =		THIS_MODULE,
 	.open =			pkt_open,
 	.release =		pkt_close,
-	.ioctl =		pkt_ioctl,
+	.locked_ioctl =		pkt_ioctl,
 	.media_changed =	pkt_media_changed,
 };
 
