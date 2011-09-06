@@ -31,8 +31,8 @@
 
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(15)
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
-#define DEF_SAMPLING_DOWN_FACTOR		(170)
-#define MAX_SAMPLING_DOWN_FACTOR		(100000)
+#define DEF_SAMPLING_DOWN_FACTOR		(60)
+#define MAX_SAMPLING_DOWN_FACTOR		(80000)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
 #define MICRO_FREQUENCY_UP_THRESHOLD		(95)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
@@ -117,7 +117,7 @@ static struct dbs_tuners {
 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
 	.ignore_nice = 0,
-	.powersave_bias = 100,
+	.powersave_bias = 50,
 	.suspend_freq = DEF_SUSPEND_FREQ,
 };
 
