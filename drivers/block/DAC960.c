@@ -79,28 +79,23 @@ static int DAC960_open(struct block_device *bdev, fmode_t mode)
 	struct gendisk *disk = bdev->bd_disk;
 	DAC960_Controller_T *p = disk->queue->queuedata;
 	int drive_nr = (long)disk->private_data;
-	int ret = -ENXIO;
 
-	lock_kernel();
 	if (p->FirmwareType == DAC960_V1_Controller) {
 		if (p->V1.LogicalDriveInformation[drive_nr].
 		    LogicalDriveState == DAC960_V1_LogicalDrive_Offline)
-			goto out;
+			return -ENXIO;
 	} else {
 		DAC960_V2_LogicalDeviceInfo_T *i =
 			p->V2.LogicalDeviceInformation[drive_nr];
 		if (!i || i->LogicalDeviceState == DAC960_V2_LogicalDevice_Offline)
-			goto out;
+			return -ENXIO;
 	}
 
 	check_disk_change(bdev);
 
 	if (!get_capacity(p->disks[drive_nr]))
-		goto out;
-	ret = 0;
-out:
-	unlock_kernel();
-	return ret;
+		return -ENXIO;
+	return 0;
 }
 
 static int DAC960_getgeo(struct block_device *bdev, struct hd_geometry *geo)
