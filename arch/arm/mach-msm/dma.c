@@ -528,6 +528,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 	unsigned long irq_flags;
 	unsigned int ch_status;
 	unsigned int ch_result;
+	unsigned int valid = 0;
 	struct msm_dmov_cmd *cmd;
 	unsigned char done_complete_flag = 0x0;
 	int adm = DMOV_IRQ_TO_ADM(irq);
@@ -550,6 +551,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 			continue;
 		}
 		do {
+			valid = 1;
 			ch_result = readl_relaxed(DMOV_REG(DMOV_RSLT(ch), adm));
 			if (list_empty(&dmov_conf[adm].active_commands[ch])) {
 				PRINT_ERROR("msm_datamover_irq_handler id %d, got result "
@@ -645,7 +647,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 	}
 
 	start_ready_cmds(adm);
-	if (!dmov_conf[adm].channel_active) {
+	if (!dmov_conf[adm].channel_active && valid) {
 		disable_irq_nosync(dmov_conf[adm].irq);
 #ifndef CONFIG_MSM_ADM3
 		clk_ctl = CLK_TO_BE_DIS;
@@ -654,7 +656,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
 	}
 
 	spin_unlock_irqrestore(&dmov_conf[adm].lock, irq_flags);
-	return IRQ_HANDLED;
+	return valid ? IRQ_HANDLED : IRQ_NONE;
 }
 
 #ifndef CONFIG_MSM_ADM3
