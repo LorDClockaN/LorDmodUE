@@ -391,29 +391,6 @@ static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
-				    const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-	ret = sscanf(buf, "%u", &input);
-
-	if (ret != 1)
-		return -EINVAL;
-
-	if (input > 30)
-		input = 30;
-
-	if (input < 0)
-		input = 0;
-
-	mutex_lock(&dbs_mutex);
-	dbs_tuners_ins.down_differential = input;
-	mutex_unlock(&dbs_mutex);
-
-	return count;
-}
-
 define_one_global_rw(sampling_rate);
 define_one_global_rw(io_is_busy);
 define_one_global_rw(up_threshold);

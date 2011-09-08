@@ -99,7 +99,7 @@ if [ -d .git ]; then
 	einfo "Clean-up old modules"
 	test -d ${finished}/system/lib/modules && rm -f ${finished}/system/lib/modules/*
 	test -d ${finished}/kernel/zImage && rm -f ${finished}/kernel/zImage
-	find ${obj_dir} -name "*.ko" | xargs rm -f
+#	find ${obj_dir} -name "*.ko" | xargs rm -f
 
 	compile_kernel
 	install_kernel
