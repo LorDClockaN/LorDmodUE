@@ -29,7 +29,7 @@ ewarn() {
 
 dexec () {
     CMD="$@"
-    echo "exec:$CMD" >> $LOG
+    echo "Exec:$CMD" >> $LOG
     eval $CMD >> $LOG 2>&1 || die "Die:$CMD"
 }
 
@@ -68,7 +68,7 @@ setup_anykernel () {
 		dexec git archive --format zip --output ../u.zip master
 	)
 	test -d $finished && dexec rm -fr $finished
-	dexec unzip ../build/u.zip -d $finished 2>&1 > /dev/null
+	dexec unzip ../build/u.zip -d $finished
 	dexec rm -f ../build/u.zip
 }
 
