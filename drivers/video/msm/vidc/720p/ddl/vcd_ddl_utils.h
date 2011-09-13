@@ -42,7 +42,7 @@
 
 void ddl_pmem_alloc(struct ddl_buf_addr *, u32, u32);
 
-void ddl_pmem_free(struct ddl_buf_addr);
+void ddl_pmem_free(struct ddl_buf_addr *);
 
 void ddl_get_core_start_time(u8 codec);
 
