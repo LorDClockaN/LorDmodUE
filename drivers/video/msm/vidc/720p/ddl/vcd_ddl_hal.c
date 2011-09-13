@@ -809,7 +809,7 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 			(decoder->client_frame_size.stride >> 4) *
 			((decoder->client_frame_size.scan_lines >> 4) + 1));
 		if (decoder->dpb_comv_buffer.virtual_base_addr)
-			ddl_pmem_free(decoder->dpb_comv_buffer);
+			ddl_pmem_free(&decoder->dpb_comv_buffer);
 		ddl_pmem_alloc(&decoder->dpb_comv_buffer, comv_buf_size,
 			       DDL_LINEAR_BUFFER_ALIGN_BYTES);
 		if (!decoder->dpb_comv_buffer.virtual_base_addr) {
@@ -824,19 +824,28 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 	}
 	decoder->ref_buffer.align_physical_addr = NULL;
 	if (ref_buf_no) {
-		size_t sz, align_bytes;
+		size_t sz, align_bytes, y_sz, frm_sz;
+		u32 i = 0;
 		sz = decoder->dp_buf.dec_pic_buffers[0].vcd_frm.alloc_len;
+		frm_sz = sz;
+		y_sz = decoder->client_frame_size.height *
+				decoder->client_frame_size.width;
 		sz *= ref_buf_no;
 		align_bytes = decoder->client_output_buf_req.align;
 		if (decoder->ref_buffer.virtual_base_addr)
-			ddl_pmem_free(decoder->ref_buffer);
+			ddl_pmem_free(&decoder->ref_buffer);
 		ddl_pmem_alloc(&decoder->ref_buffer, sz, align_bytes);
 		if (!decoder->ref_buffer.virtual_base_addr) {
-			ddl_pmem_free(decoder->dpb_comv_buffer);
+			ddl_pmem_free(&decoder->dpb_comv_buffer);
 			VIDC_LOGERR_STRING
 			    ("Dec_set_buf:mpeg_ref_buf_alloc_failed");
 			return VCD_ERR_ALLOC_FAIL;
 		}
+		memset((u8 *)decoder->ref_buffer.virtual_base_addr,
+			0x80, sz);
+		for (i = 0; i < ref_buf_no; i++)
+			memset((u8 *)decoder->ref_buffer.align_virtual_addr +
+				i*frm_sz, 0x10, y_sz);
 	}
 	ddl_decode_set_metadata_output(decoder);
 	ddl_decoder_dpb_transact(decoder, NULL, DDL_DPB_OP_INIT);

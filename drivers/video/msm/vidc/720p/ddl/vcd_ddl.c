@@ -295,7 +295,7 @@ u32 ddl_encode_start(u32 *ddl_handle, void *client_data)
 			       DDL_ENC_SEQHEADER_SIZE,
 			       DDL_LINEAR_BUFFER_ALIGN_BYTES);
 		if (!encoder->seq_header.virtual_base_addr) {
-			ddl_pmem_free(encoder->enc_dpb_addr);
+			ddl_pmem_free(&encoder->enc_dpb_addr);
 			VIDC_LOGERR_STRING
 			    ("ddl_enc_start:Seq_hdr_alloc_failed");
 			return VCD_ERR_ALLOC_FAIL;
