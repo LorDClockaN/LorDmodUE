@@ -1,6 +1,11 @@
+config XVMALLOC
+	bool
+	default n
+
 config ZRAM
 	tristate "Compressed RAM block device support"
 	depends on BLOCK && SYSFS
+	select XVMALLOC
 	select LZO_COMPRESS
 	select LZO_DECOMPRESS
 	default n
@@ -23,3 +28,21 @@ config ZRAM_DEBUG
 	help
 	  This option adds additional debugging code to the compressed
 	  RAM block device driver.
+
+config ZCACHE
+	bool "Page cache compression support"
+	depends on CLEANCACHE
+	select XVMALLOC
+	select LZO_COMPRESS
+	select LZO_DECOMPRESS
+	default n
+	help
+	  Compresses relatively unused page cache pages and stores them in
+	  memory itself. This increases effective memory size and can help
+	  reduce access to backing store device(s) which is typically much
+	  slower than access to main memory.
+
+	  Statistics are expoted through sysfs interface:
+	  /sys/kernel/mm/zcache/
+
+	  Project home: http://compcache.googlecode.com/
