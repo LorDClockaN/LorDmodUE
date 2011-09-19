@@ -74,7 +74,6 @@ setup_anykernel () {
 
 install_kernel () {
 	einfo  "Install modules"
-    doexec "echo - ../build/${git_repo}/install remove"
 	test -d ../build/${git_repo}/install && rm -fr ../build/${git_repo}/install
 	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		KERNEL_DIR=$KERNEL_DIR \
