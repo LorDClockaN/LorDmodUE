@@ -61,7 +61,7 @@ compile_kernel () {
 
 setup_anykernel () {
 	test -d $anykernel_dir || 
-		dexec git clone git://github.com/ac1965/AnyKernel.git $anykernel_dir
+	dexec git clone git://github.com/ac1965/AnyKernel.git $anykernel_dir
 	(
 		cd $anykernel_dir
 		dexec git pull
@@ -74,7 +74,7 @@ setup_anykernel () {
 
 install_kernel () {
 	einfo  "Install modules"
-	dexec rm -fr ../build/install
+	dexec test -d ../build/${git_repo}/install && rm -fr ../build/${git_repo}/install
 	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		KERNEL_DIR=$KERNEL_DIR \
 		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
