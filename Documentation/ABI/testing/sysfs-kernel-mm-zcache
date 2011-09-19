@@ -1,0 +1,53 @@
+What:		/sys/kernel/mm/zcache
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		/sys/kernel/mm/zcache directory contains compressed cache
+		statistics for each pool. A separate pool is created for
+		every mount instance of cleancache-aware filesystems.
+
+What:		/sys/kernel/mm/zcache/pool<id>/zero_pages
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		The zero_pages file is read-only and specifies number of zero
+		filled pages found in this pool.
+
+What:		/sys/kernel/mm/zcache/pool<id>/orig_data_size
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		The orig_data_size file is read-only and specifies uncompressed
+		size of data stored in this pool. This excludes zero-filled
+		pages (zero_pages) since no memory is allocated for them.
+		Unit: bytes
+
+What:		/sys/kernel/mm/zcache/pool<id>/compr_data_size
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		The compr_data_size file is read-only and specifies compressed
+		size of data stored in this pool. So, compression ratio can be
+		calculated using orig_data_size and this statistic.
+		Unit: bytes
+
+What:		/sys/kernel/mm/zcache/pool<id>/mem_used_total
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		The mem_used_total file is read-only and specifies the amount
+		of memory, including allocator fragmentation and metadata
+		overhead, allocated for this pool. So, allocator space
+		efficiency can be calculated using compr_data_size and this
+		statistic.
+		Unit: bytes
+
+What:		/sys/kernel/mm/zcache/pool<id>/memlimit
+Date:		July 2010
+Contact:	Nitin Gupta <ngupta@vflare.org>
+Description:
+		The memlimit file is read-write and specifies upper bound on
+		the compressed data size (compr_data_dize) stored in this pool.
+		The value specified is rounded down to nearest multiple of
+		PAGE_SIZE.
+		Unit: bytes
