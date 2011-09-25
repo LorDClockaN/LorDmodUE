@@ -1,11 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.14
-<<<<<<< HEAD:arch/arm/configs/lordmodaufs_defconfig
 # Mon Sep 19 10:13:01 2011
-=======
-# Fri Sep 23 21:38:28 2011
->>>>>>> lordclockan/2.6.35-BFS-WIP:arch/arm/configs/lordmoduebfs_defconfig
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -40,11 +36,7 @@ CONFIG_BROKEN_ON_SMP=y
 CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 CONFIG_CROSS_COMPILE=""
-<<<<<<< HEAD:arch/arm/configs/lordmodaufs_defconfig
 CONFIG_LOCALVERSION="-LorDmodUE-7.1-CFS-aufs-b3"
-=======
-CONFIG_LOCALVERSION="-LorDmodUE-7.2-CFS"
->>>>>>> lordclockan/2.6.35-BFS-WIP:arch/arm/configs/lordmoduebfs_defconfig
 # CONFIG_LOCALVERSION_AUTO is not set
 CONFIG_HAVE_KERNEL_GZIP=y
 CONFIG_HAVE_KERNEL_LZMA=y
