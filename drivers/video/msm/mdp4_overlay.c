@@ -564,7 +564,9 @@ int mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	mdp_writel(pipe->mdp, src_xy, vg_base + 0x0004);	/* MDP_RGB_SRC_XY */
 	mdp_writel(pipe->mdp, dst_size, vg_base + 0x0008);	/* MDP_RGB_DST_SIZE */
 	mdp_writel(pipe->mdp, dst_xy, vg_base + 0x000c);	/* MDP_RGB_DST_XY */
-	mdp_writel(pipe->mdp, frame_size, vg_base + 0x0048);	/* TILE frame size */
+	
+	if (pipe->frame_format)
+		mdp_writel(pipe->mdp, frame_size, vg_base + 0x0048);	/* TILE frame size */
 
 	/* luma component plane */
 	mdp_writel(pipe->mdp, pipe->srcp0_addr, vg_base + 0x0010);
