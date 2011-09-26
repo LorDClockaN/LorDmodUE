@@ -670,7 +670,7 @@ static void mg_request_poll(struct request_queue *q)
 				break;
 		}
 
-		if (unlikely(host->req->cmd_type != REQ_TYPE_FS)) {
+		if (unlikely(!blk_fs_request(host->req))) {
 			mg_end_request_cur(host, -EIO);
 			continue;
 		}
@@ -756,7 +756,7 @@ static void mg_request(struct request_queue *q)
 			continue;
 		}
 
-		if (unlikely(req->cmd_type != REQ_TYPE_FS)) {
+		if (unlikely(!blk_fs_request(req))) {
 			mg_end_request_cur(host, -EIO);
 			continue;
 		}
@@ -974,7 +974,8 @@ static int mg_probe(struct platform_device *plat_dev)
 	host->breq->queuedata = host;
 
 	/* mflash is random device, thanx for the noop */
-	err = elevator_change(host->breq, "noop");
+	elevator_exit(host->breq->elevator);
+	err = elevator_init(host->breq, "noop");
 	if (err) {
 		printk(KERN_ERR "%s:%d (elevator_init) fail\n",
 				__func__, __LINE__);

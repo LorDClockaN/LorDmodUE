@@ -74,11 +74,11 @@ void ddl_pmem_alloc(struct ddl_buf_addr *buff_addr, size_t sz, u32 align)
 		     + align_offset);
 }
 
-void ddl_pmem_free(struct ddl_buf_addr buff_addr)
+void ddl_pmem_free(struct ddl_buf_addr *buff_addr)
 {
-	kfree(buff_addr.virtual_base_addr);
-	buff_addr.buffer_size = 0;
-	buff_addr.virtual_base_addr = NULL;
+	kfree(buff_addr->virtual_base_addr);
+	buff_addr->buffer_size = 0;
+	buff_addr->virtual_base_addr = NULL;
 }
 
 #else
@@ -111,21 +111,20 @@ void ddl_pmem_alloc(struct ddl_buf_addr *buff_addr, size_t sz, u32 align)
 	if (IS_ERR((void *)physical_addr)) {
 		pr_err("%s(): could not allocte in kernel pmem buffers\n",
 		       __func__);
-		return;
+		goto bailout;
 	}
 
 	buff_addr->virtual_base_addr =
 	    (u32 *) ioremap((unsigned long)physical_addr,
 			    sz + guard_bytes);
-	memset(buff_addr->virtual_base_addr, 0 , sz + guard_bytes);
 	if (!buff_addr->virtual_base_addr) {
 
 		pr_err("%s: could not ioremap in kernel pmem buffers\n",
 		       __func__);
 		pmem_kfree(physical_addr);
-		return;
+		goto bailout;
 	}
-
+	memset(buff_addr->virtual_base_addr, 0 , sz + guard_bytes);
 	buff_addr->buffer_size = sz;
 
 	buff_addr->align_physical_addr =
@@ -143,26 +142,35 @@ void ddl_pmem_alloc(struct ddl_buf_addr *buff_addr, size_t sz, u32 align)
 		buff_addr->buffer_size);
 
 	return;
+bailout:
+	buff_addr->physical_base_addr = NULL;
+	buff_addr->virtual_base_addr = NULL;
+	buff_addr->buffer_size = 0;
 }
 
-void ddl_pmem_free(struct ddl_buf_addr buff_addr)
+void ddl_pmem_free(struct ddl_buf_addr *buff_addr)
 {
+	if (!buff_addr) {
+		ERR("\n %s() invalid arguments %p", __func__, buff_addr);
+		return;
+	}
 	DBG("\n%s(): phy_addr %p ker_addr %p", __func__,
-		buff_addr.physical_base_addr, buff_addr.virtual_base_addr);
+		buff_addr->physical_base_addr, buff_addr->virtual_base_addr,
+		buff_addr->buffer_size);
 
-	if (buff_addr.virtual_base_addr)
-		iounmap((void *)buff_addr.virtual_base_addr);
+	if (buff_addr->virtual_base_addr)
+		iounmap((void *)buff_addr->virtual_base_addr);
 
-	if ((buff_addr.physical_base_addr) &&
-		pmem_kfree((s32) buff_addr.physical_base_addr)) {
+	if ((buff_addr->physical_base_addr) &&
+		pmem_kfree((s32) buff_addr->physical_base_addr)) {
 		ERR("\n %s(): Error in Freeing ddl_pmem_free "
 		"Physical Address %p", __func__,
-		buff_addr.physical_base_addr);
+		buff_addr->physical_base_addr);
 	}
 
-	buff_addr.buffer_size = 0;
-	buff_addr.physical_base_addr = NULL;
-	buff_addr.virtual_base_addr = NULL;
+	buff_addr->buffer_size = 0;
+	buff_addr->physical_base_addr = NULL;
+	buff_addr->virtual_base_addr = NULL;
 }
 #endif
 

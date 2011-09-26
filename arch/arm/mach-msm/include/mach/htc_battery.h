@@ -74,7 +74,9 @@ struct battery_info_reply {
 	u32 full_bat;		/* Full capacity of battery (mAh) */
 	u32 full_level;		/* Full Level */
 	u32 over_vchg;		/* 0:normal, 1:over voltage charger */
+	u32 force_high_power_charging;
 	s32 eval_current;	/* System loading current from ADC */
+	u32 charge_on_plug_enabled; /* 0: Disable, 1:Enable - can be set by user */
 };
 
 struct htc_battery_tps65200_int {
