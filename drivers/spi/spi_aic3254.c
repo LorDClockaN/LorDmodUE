@@ -14,10 +14,6 @@
  *
  */
 
-#ifdef CONFIG_MACH_SAGA
-#include "spi_aic3254_saga.c"
-#else
-
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/miscdevice.h>
@@ -1070,5 +1066,3 @@ static void __exit spi_aic3254_exit(void)
 module_exit(spi_aic3254_exit);
 
 MODULE_LICENSE("GPL");
-
-#endif
