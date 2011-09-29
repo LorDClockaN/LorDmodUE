@@ -19,7 +19,7 @@ if [ -e ./releasetools/system/lib/modules ]; then
  rm -rf ./releasetools/system/lib/modules
 fi
 
-mkdir ./releasetools/system/lib/modules
+mkdir -p ./releasetools/system/lib/modules
 
 export INSTALL_MOD_PATH=./mod_inst
 make modules -j`grep 'processor' /proc/cpuinfo | wc -l`
