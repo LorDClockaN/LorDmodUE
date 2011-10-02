@@ -2,7 +2,7 @@
 # Created by eXistZ
 
 
-VERSION="v1.0.4"
+VERSION="v1.0.5"
 KERNEL_SRC="/usr/src/htc-kernel-msm7x30"
 
 # Linaro Android 4.5 (GCC 4.5.4) toolchain - http://www.linaro.org
