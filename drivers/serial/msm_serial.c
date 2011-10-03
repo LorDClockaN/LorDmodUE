@@ -193,11 +193,12 @@ void msm_serial_clock_on(struct uart_port *port, int force) {
 #define WAKE_UP_IND	0x32
 static irqreturn_t msm_rx_irq(int irq, void *dev_id)
 {
+	unsigned long flags;
 	struct uart_port *port = dev_id;
 	struct msm_port *msm_port = UART_TO_MSM(port);
 	int inject_wakeup = 0;
 
-	spin_lock(&port->lock);
+	spin_lock_irqsave(&port->lock, flags);
 
 	if (msm_port->clk_state == MSM_CLK_OFF)
 		inject_wakeup = 1;
@@ -212,7 +213,7 @@ static irqreturn_t msm_rx_irq(int irq, void *dev_id)
 		tty_flip_buffer_push(tty);
 	}
 
-	spin_unlock(&port->lock);
+	spin_unlock_irqrestore(&port->lock, flags);
 	return IRQ_HANDLED;
 }
 #endif
@@ -313,11 +314,12 @@ static void handle_delta_cts(struct uart_port *port)
 
 static irqreturn_t msm_irq(int irq, void *dev_id)
 {
+	unsigned long flags;
 	struct uart_port *port = dev_id;
 	struct msm_port *msm_port = UART_TO_MSM(port);
 	unsigned int misr;
 
-	spin_lock(&port->lock);
+	spin_lock_irqsave(&port->lock, flags);
 	clk_enable(msm_port->clk);
 	misr = msm_read(port, UART_MISR);
 	msm_write(port, 0, UART_IMR); /* disable interrupt */
@@ -331,7 +333,7 @@ static irqreturn_t msm_irq(int irq, void *dev_id)
 
 	msm_write(port, msm_port->imr, UART_IMR); /* restore interrupt */
 	clk_disable(msm_port->clk);
-	spin_unlock(&port->lock);
+	spin_unlock_irqrestore(&port->lock, flags);
 
 	return IRQ_HANDLED;
 }
