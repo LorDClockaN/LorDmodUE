@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.14
-# Fri Sep 30 14:41:04 2011
+# Tue Oct  4 12:11:11 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -523,6 +523,7 @@ CONFIG_CMDLINE="init=/sbin/init root=/dev/ram rw initrd=0x11000000,16M console=t
 # CONFIG_CMDLINE_FORCE is not set
 # CONFIG_XIP_KERNEL is not set
 # CONFIG_KEXEC is not set
+# CONFIG_AUTO_ZRELADDR is not set
 
 #
 # CPU Power Management
