@@ -39,10 +39,10 @@ static unsigned int mfc_clk_freq_table[3] = {
 
 #ifndef CONFIG_MSM_NPA_SYSTEM_BUS
 static unsigned int axi_clk_freq_table_enc[2] = {
-	122880, 192000
+	122880, 201600
 };
 static unsigned int axi_clk_freq_table_dec[2] = {
-	122880, 192000
+	122880, 201600
 };
 #else
 static unsigned int axi_clk_freq_table_enc[2] = {

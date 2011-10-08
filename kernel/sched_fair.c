@@ -879,7 +879,7 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 		if (delta < 0)
 			return;
 
-		if (delta > ideal_runtime)
+		if (delta > calc_delta_fair(ideal_runtime, curr))if (delta > ideal_runtime)
 			resched_task(rq_of(cfs_rq)->curr);
 	}
 }

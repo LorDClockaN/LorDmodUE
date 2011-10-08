@@ -641,19 +641,18 @@ static void clocksource_enqueue(struct clocksource *cs)
 #define MAX_UPDATE_LENGTH 5 /* Seconds */
 
 /**
- * __clocksource_register_scale - Used to install new clocksources
+ * __clocksource_updatefreq_scale - Used update clocksource with new freq
  * @t:		clocksource to be registered
  * @scale:	Scale factor multiplied against freq to get clocksource hz
  * @freq:	clocksource frequency (cycles per second) divided by scale
  *
- * Returns -EBUSY if registration fails, zero otherwise.
+ * This should only be called from the clocksource->enable() method.
  *
  * This *SHOULD NOT* be called directly! Please use the
- * clocksource_register_hz() or clocksource_register_khz helper functions.
+ * clocksource_updatefreq_hz() or clocksource_updatefreq_khz helper functions.
  */
-int __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq)
+void __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq)
 {
-
 	/*
 	 * Ideally we want to use  some of the limits used in
 	 * clocksource_max_deferment, to provide a more informed
@@ -664,7 +663,28 @@ int __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq)
 				      NSEC_PER_SEC/scale,
 				      MAX_UPDATE_LENGTH*scale);
 	cs->max_idle_ns = clocksource_max_deferment(cs);
+}
+EXPORT_SYMBOL_GPL(__clocksource_updatefreq_scale);
 
+/**
+ * __clocksource_register_scale - Used to install new clocksources
+ * @t:    clocksource to be registered
+ * @scale:  Scale factor multiplied against freq to get clocksource hz
+ * @freq:  clocksource frequency (cycles per second) divided by scale
+ *
+ * Returns -EBUSY if registration fails, zero otherwise.
+ *
+ * This *SHOULD NOT* be called directly! Please use the
+ * clocksource_register_hz() or clocksource_register_khz helper functions.
+ */
+int __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq)
+{
+
+  /* Intialize mult/shift and max_idle_ns */
+  __clocksource_updatefreq_scale(cs, scale, freq);
+
+
+  /* Add clocksource to the clcoksource list */
 	mutex_lock(&clocksource_mutex);
 	clocksource_enqueue(cs);
 	clocksource_enqueue_watchdog(cs);
