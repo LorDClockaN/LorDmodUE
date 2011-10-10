@@ -150,17 +150,6 @@ void cpuidle_pause_and_lock(void)
 
 EXPORT_SYMBOL_GPL(cpuidle_pause_and_lock);
 
-/**
- * cpuidle_resume_and_unlock - resumes CPUIDLE operation
- */
-void cpuidle_resume_and_unlock(void)
-{
-	cpuidle_install_idle_handler();
-	mutex_unlock(&cpuidle_lock);
-}
-
-EXPORT_SYMBOL_GPL(cpuidle_resume_and_unlock);
-
 #ifdef CONFIG_ARCH_HAS_CPU_RELAX
 static int poll_idle(struct cpuidle_device *dev, struct cpuidle_state *st)
 {
@@ -188,17 +177,28 @@ static void poll_idle_init(struct cpuidle_device *dev)
 
 	cpuidle_set_statedata(state, NULL);
 
-	snprintf(state->name, CPUIDLE_NAME_LEN, "POLL");
+	snprintf(state->name, CPUIDLE_NAME_LEN, "C0");
 	snprintf(state->desc, CPUIDLE_DESC_LEN, "CPUIDLE CORE POLL IDLE");
 	state->exit_latency = 0;
 	state->target_residency = 0;
 	state->power_usage = -1;
-	state->flags = 0;
+	state->flags = CPUIDLE_FLAG_POLL;
 	state->enter = poll_idle;
 }
 #else
 static void poll_idle_init(struct cpuidle_device *dev) {}
 #endif /* CONFIG_ARCH_HAS_CPU_RELAX */
+
+/**
+ * cpuidle_resume_and_unlock - resumes CPUIDLE operation
+ */
+void cpuidle_resume_and_unlock(void)
+{
+	cpuidle_install_idle_handler();
+	mutex_unlock(&cpuidle_lock);
+}
+
+EXPORT_SYMBOL_GPL(cpuidle_resume_and_unlock);
 
 /**
  * cpuidle_enable_device - enables idle PM for a CPU
@@ -223,6 +223,8 @@ int cpuidle_enable_device(struct cpuidle_device *dev)
 		if (ret)
 			return ret;
 	}
+
+	poll_idle_init(dev);
 
 	poll_idle_init(dev);
 
