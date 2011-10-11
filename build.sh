@@ -12,7 +12,7 @@ make -j8 ARCH=arm CROSS_COMPILE=$CCOMPILER EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vect
 
 cp arch/arm/boot/zImage ../finished/;
 cp drivers/net/wireless/bcm4329/bcm4329.ko ../finished/;
-#cp drivers/staging/zram/zram.ko ../finished/;
+cp drivers/staging/zram/zram.ko ../finished/;
 #cp lib/lzo/lzo_compress.ko ../finished/;
 cp arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko ../finished/;
 cp drivers/net/kineto_gan.ko ../finished/;
