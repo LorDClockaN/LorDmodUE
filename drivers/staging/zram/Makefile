@@ -1,4 +1,4 @@
-zram-objs	:=	zram_drv.o
+zram-objs	:=	zram_drv.o zram_sysfs.o
 zcache-objs	:=	zcache_drv.o
 
 obj-$(CONFIG_ZRAM)	+=	zram.o
