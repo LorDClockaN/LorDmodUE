@@ -47,7 +47,9 @@ config_kernel ()
 
 compile_kernel () {
 	einfo "Compile kernel"
-    einfo " * you can read log: tail -f $LOG"
+    	einfo " * you can read log: tail -f $LOG"
+	dexec make ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+		O=${obj_dir} oldconfig
 	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		KERNEL_DIR=$KERNEL_DIR \
 		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
