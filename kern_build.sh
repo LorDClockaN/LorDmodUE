@@ -101,8 +101,21 @@ install_kernel () {
 	)
 }
 
+clean () {
+	einfo "Clean-up old modules"
+	test -d ${finished}/system/lib/modules && dexec rm -f ${finished}/system/lib/modules/*
+	test -d ${finished}/kernel/zImage && dexec rm -f ${finished}/kernel/zImage
+	dexec find ${obj_dir} -name "*.ko" | xargs rm -f
+}
+
+usage () {
+	echo "usage: $(basename $0) [all|clean|install]"
+	exit 0
+}
+
 # -- start script
 
+test "$#" = 0 && usage
 test -d ${obj_dir} || install -d ${obj_dir}
 test -f ${obj_dir}/.config || config_kernel
 test -f ${LOG} && rm -f ${LOG}
@@ -111,14 +124,17 @@ if [ -d .git ]; then
 	KERNEL_DIR=$(readlink -f $(dirname .))
 	einfo "Git Repository: $git_repo"
 
-	einfo "Clean-up old modules"
-	test -d ${finished}/system/lib/modules && dexec rm -f ${finished}/system/lib/modules/*
-	test -d ${finished}/kernel/zImage && dexec rm -f ${finished}/kernel/zImage
-	dexec find ${obj_dir} -name "*.ko" | xargs rm -f
-
-	compile_kernel
-	install_kernel
-	
+	case "$1" in
+	all)
+		clean && compile_kernel && install_kernell;;
+	clean)
+		clean;;
+	install)
+		kernel_install;;
+	*)
+		echo "invalid argument: $1"
+		usage;;
+	esac
 else
 	ewarn "not in git repository"
 fi
