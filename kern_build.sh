@@ -86,7 +86,7 @@ install_kernel () {
 	einfo "Setup Anykernel"
 	setup_anykernel
 	dt=$(date +%Y%m%d%H%M)
-	zipedf="update-${dt}.zip"
+	zipedf="update_${git_repo}-${dt}.zip"
 
 	einfo "Install packages [$zipedf]"
 	find ${obj_dir}/arch/${ARCH} -name zImage -exec install -D {} ${finished}/kernel/zImage \;
