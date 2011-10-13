@@ -2094,7 +2094,7 @@ static void powersave_early_suspend(struct early_suspend *handler)
 		//save max freq from old policy before setting up new policy
 		cpufreq_cur_max = cpu_policy->user_policy.max;
 		new_policy.max = 652800;
-		new_policy.min = 192000;
+		//new_policy.min = 192000;
 		__cpufreq_set_policy(cpu_policy, &new_policy);
 		cpu_policy->user_policy.policy = cpu_policy->policy;
 		cpu_policy->user_policy.governor = cpu_policy->governor;
@@ -2117,7 +2117,7 @@ static void powersave_late_resume(struct early_suspend *handler)
 			goto out;
 		//use cpufreq_cur_max to reset the correct max frequency when awakening
 		new_policy.max = cpufreq_cur_max;
-		new_policy.min = 268800;
+		//new_policy.min = 268800;
 		__cpufreq_set_policy(cpu_policy, &new_policy);
 		cpu_policy->user_policy.policy = cpu_policy->policy;
 		cpu_policy->user_policy.governor = cpu_policy->governor;
