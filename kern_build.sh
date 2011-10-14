@@ -126,11 +126,11 @@ if [ -d .git ]; then
 
 	case "$1" in
 	all)
-		clean && compile_kernel && install_kernell;;
+		clean && compile_kernel && install_kernel;;
 	clean)
 		clean;;
 	install)
-		kernel_install;;
+		install_kernel;;
 	*)
 		echo "invalid argument: $1"
 		usage;;
