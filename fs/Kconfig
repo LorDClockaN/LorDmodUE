@@ -226,7 +226,7 @@ config LOCKD_V4
 	default y
 
 config EXPORTFS
-	tristate
+	bool
 
 config NFS_ACL_SUPPORT
 	tristate
