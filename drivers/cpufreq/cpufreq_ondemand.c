@@ -32,9 +32,9 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
-#define DEF_FREQUENCY_UP_THRESHOLD		(80)
-#define DEF_SAMPLING_DOWN_FACTOR		(1)
+#define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(15)
+#define DEF_FREQUENCY_UP_THRESHOLD		(85)
+#define DEF_SAMPLING_DOWN_FACTOR		(50)
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
 #define MICRO_FREQUENCY_UP_THRESHOLD		(95)
@@ -121,7 +121,7 @@ static struct dbs_tuners {
 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
 	.ignore_nice = 0,
-	.powersave_bias = 0,
+	.powersave_bias = 50,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
