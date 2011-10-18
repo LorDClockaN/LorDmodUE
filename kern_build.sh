@@ -1,18 +1,22 @@
 #! /bin/bash
 
 # chrooted gentoo on DesireHD.
+# if toolchain use, type `CROSS_COMPILE="...." ./kern_build.sh'
 
+myname="$(basename $0 .sh)"
+def_config=lordmodaufs_defconfig
+
+build_dir="$(readlink -f ../build)"
 cpuinfo=$(grep -i processor /proc/cpuinfo | wc -l)
 git_repo=$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/*\s//g')
-obj_dir="$(readlink -f ..)/build/${git_repo}/obj"
-finished="$(readlink -f ..)/build/${git_repo}/finished"
-anykernel_dir="$(readlink -f ..)/build/AnyKernel"
-def_config=lordmodaufs_defconfig
+obj_dir="${build_dir}/${git_repo}/obj"
+finished="${build_dir}/${git_repo}/finished"
+anykernel_dir="${build_dir}/AnyKernel"
 
 ARCH=${ARCH:=arm}
 CROSS_COMPILE=${CROSS_COMPILE:=}
 EXTRA_AFLAGS="-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block"
-LOG="$(readlink -f ..)/build/${git_repo}/$(basename $0 .sh).log"
+LOG="$(build_dir}/${git_repo}/${myname}.log"
 
 die() {
     echo -e "\033[1;30m>\033[0;31m>\033[1;31m> ERROR:\033[0m ${@}"
@@ -116,13 +120,14 @@ usage () {
 # -- start script
 
 test "$#" = 0 && usage
-test -d ${obj_dir} || install -d ${obj_dir}
-test -f ${obj_dir}/.config || config_kernel
 test -f ${LOG} && rm -f ${LOG}
 
 if [ -d .git ]; then
 	KERNEL_DIR=$(readlink -f $(dirname .))
 	einfo "Git Repository: $git_repo"
+
+	test -d ${obj_dir} || install -d ${obj_dir}
+	test -f ${obj_dir}/.config || config_kernel
 
 	case "$1" in
 	all)
