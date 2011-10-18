@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,8 +45,10 @@ int au_wh_init(struct dentry *h_parent, struct au_branch *br,
 /* diropq flags */
 #define AuDiropq_CREATE	1
 #define au_ftest_diropq(flags, name)	((flags) & AuDiropq_##name)
-#define au_fset_diropq(flags, name)	{ (flags) |= AuDiropq_##name; }
-#define au_fclr_diropq(flags, name)	{ (flags) &= ~AuDiropq_##name; }
+#define au_fset_diropq(flags, name) \
+	do { (flags) |= AuDiropq_##name; } while (0)
+#define au_fclr_diropq(flags, name) \
+	do { (flags) &= ~AuDiropq_##name; } while (0)
 
 struct dentry *au_diropq_sio(struct dentry *dentry, aufs_bindex_t bindex,
 			     unsigned int flags);
@@ -58,7 +60,7 @@ struct dentry *au_wh_create(struct dentry *dentry, aufs_bindex_t bindex,
 /* real rmdir for the whiteout-ed dir */
 struct au_whtmp_rmdir {
 	struct inode *dir;
-	aufs_bindex_t bindex;
+	struct au_branch *br;
 	struct dentry *wh_dentry;
 	struct au_nhash whlist;
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,8 +46,8 @@ struct au_fidir {
 
 static inline int au_fidir_sz(int nent)
 {
-       AuDebugOn(nent < 0);
-       return sizeof(struct au_fidir) + sizeof(struct au_hfile) * nent;
+	AuDebugOn(nent < 0);
+	return sizeof(struct au_fidir) + sizeof(struct au_hfile) * nent;
 }
 
 struct au_finfo {
@@ -129,8 +129,6 @@ void au_set_h_fptr(struct file *file, aufs_bindex_t bindex,
 		   struct file *h_file);
 
 void au_update_figen(struct file *file);
-void au_fi_mmap_lock(struct file *file);
-void au_fi_mmap_unlock(struct file *file);
 struct au_fidir *au_fidir_alloc(struct super_block *sb);
 int au_fidir_realloc(struct au_finfo *finfo, int nbr);
 

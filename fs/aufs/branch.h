@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,6 +81,11 @@ struct au_branch {
 	blkcnt_t		br_xino_upper;	/* watermark in blocks */
 	atomic_t		br_xino_running;
 
+#ifdef CONFIG_AUFS_HFSNOTIFY
+	struct fsnotify_group	*br_hfsn_group;
+	struct fsnotify_ops	br_hfsn_ops;
+#endif
+
 #ifdef CONFIG_SYSFS
 	/* an entry under sysfs per mount-point */
 	char			br_name[8];
@@ -142,9 +147,13 @@ struct au_opt_add;
 int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount);
 struct au_opt_del;
 int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount);
+long au_ibusy_ioctl(struct file *file, unsigned long arg);
+#ifdef CONFIG_COMPAT
+long au_ibusy_compat_ioctl(struct file *file, unsigned long arg);
+#endif
 struct au_opt_mod;
 int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
-	      int *do_update);
+	      int *do_refresh);
 
 /* xino.c */
 static const loff_t au_loff_max = LLONG_MAX;
@@ -195,7 +204,7 @@ struct super_block *au_sbr_sb(struct super_block *sb, aufs_bindex_t bindex)
 
 static inline void au_sbr_put(struct super_block *sb, aufs_bindex_t bindex)
 {
-	atomic_dec_return(&au_sbr(sb, bindex)->br_count);
+	atomic_dec(&au_sbr(sb, bindex)->br_count);
 }
 
 static inline int au_sbr_perm(struct super_block *sb, aufs_bindex_t bindex)

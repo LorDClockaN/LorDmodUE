@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,6 +76,10 @@ static void au_cache_fin(void)
 
 int au_dir_roflags;
 
+#ifdef CONFIG_AUFS_SBILIST
+struct au_splhead au_sbilist;
+#endif
+
 /*
  * functions for module interface.
  */
@@ -116,15 +120,19 @@ static int __init aufs_init(void)
 
 	au_dir_roflags = au_file_roflags(O_DIRECTORY | O_LARGEFILE);
 
+	au_sbilist_init();
 	sysaufs_brs_init();
 	au_debug_init();
 	au_dy_init();
 	err = sysaufs_init();
 	if (unlikely(err))
 		goto out;
-	err = au_wkq_init();
+	err = au_procfs_init();
 	if (unlikely(err))
 		goto out_sysaufs;
+	err = au_wkq_init();
+	if (unlikely(err))
+		goto out_procfs;
 	err = au_hnotify_init();
 	if (unlikely(err))
 		goto out_wkq;
@@ -141,18 +149,20 @@ static int __init aufs_init(void)
 	printk(KERN_INFO AUFS_NAME " " AUFS_VERSION "\n");
 	goto out; /* success */
 
- out_cache:
+out_cache:
 	au_cache_fin();
- out_sysrq:
+out_sysrq:
 	au_sysrq_fin();
- out_hin:
+out_hin:
 	au_hnotify_fin();
- out_wkq:
+out_wkq:
 	au_wkq_fin();
- out_sysaufs:
+out_procfs:
+	au_procfs_fin();
+out_sysaufs:
 	sysaufs_fin();
 	au_dy_fin();
- out:
+out:
 	return err;
 }
 
@@ -163,6 +173,7 @@ static void __exit aufs_exit(void)
 	au_sysrq_fin();
 	au_hnotify_fin();
 	au_wkq_fin();
+	au_procfs_fin();
 	sysaufs_fin();
 	au_dy_fin();
 }

@@ -16,7 +16,7 @@ anykernel_dir="${build_dir}/AnyKernel"
 ARCH=${ARCH:=arm}
 CROSS_COMPILE=${CROSS_COMPILE:=}
 EXTRA_AFLAGS="-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block"
-LOG="$(build_dir}/${git_repo}/${myname}.log"
+LOG="${build_dir}/${git_repo}/${myname}.log"
 
 die() {
     echo -e "\033[1;30m>\033[0;31m>\033[1;31m> ERROR:\033[0m ${@}"
@@ -40,11 +40,9 @@ dexec () {
 config_kernel ()
 {
 	einfo "Configure kernel"
-	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
+	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		O=${obj_dir} $def_config
-	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
+	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		O=${obj_dir} menuconfig
 	die "Interrupt compile"
 }
@@ -52,7 +50,7 @@ config_kernel ()
 compile_kernel () {
 	einfo "Compile kernel"
     	einfo " * you can read log: tail -f $LOG"
-	dexec echo oldconfig
+	ewarn " * make oldconfig"
 	make ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		O=${obj_dir} oldconfig
 	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
@@ -109,11 +107,13 @@ clean () {
 	einfo "Clean-up old modules"
 	test -d ${finished}/system/lib/modules && dexec rm -f ${finished}/system/lib/modules/*
 	test -d ${finished}/kernel/zImage && dexec rm -f ${finished}/kernel/zImage
-	dexec find ${obj_dir} -name "*.ko" | xargs rm -f
+	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+		KERNEL_DIR=$KERNEL_DIR \
+		O=${obj_dir} clean
 }
 
 usage () {
-	echo "usage: $(basename $0) [all|clean|install]"
+	echo "usage: $(basename $0) [all | compile | install |clean]"
 	exit 0
 }
 
@@ -123,19 +123,20 @@ test "$#" = 0 && usage
 test -f ${LOG} && rm -f ${LOG}
 
 if [ -d .git ]; then
-	KERNEL_DIR=$(readlink -f $(dirname .))
 	einfo "Git Repository: $git_repo"
-
+	KERNEL_DIR=$(readlink -f $(dirname .))
 	test -d ${obj_dir} || install -d ${obj_dir}
 	test -f ${obj_dir}/.config || config_kernel
 
 	case "$1" in
 	all)
 		clean && compile_kernel && install_kernel;;
-	clean)
-		clean;;
+	compile)
+		compile_kernel;;
 	install)
 		install_kernel;;
+	clean)
+		clean;;
 	*)
 		echo "invalid argument: $1"
 		usage;;

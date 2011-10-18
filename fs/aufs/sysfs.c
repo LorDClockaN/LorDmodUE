@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -180,7 +180,7 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 	}
 	BUG();
 
- out_seq:
+out_seq:
 	if (!err) {
 		err = seq->count;
 		/* sysfs limit */
@@ -188,9 +188,9 @@ ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			err = -EFBIG;
 	}
 	kfree(seq);
- out_unlock:
+out_unlock:
 	si_read_unlock(sb);
- out:
+out:
 	return err;
 }
 

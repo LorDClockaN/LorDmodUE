@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -75,8 +75,10 @@ struct au_icntnr {
 #define AuPin_DI_LOCKED		1
 #define AuPin_MNT_WRITE		(1 << 1)
 #define au_ftest_pin(flags, name)	((flags) & AuPin_##name)
-#define au_fset_pin(flags, name)	{ (flags) |= AuPin_##name; }
-#define au_fclr_pin(flags, name)	{ (flags) &= ~AuPin_##name; }
+#define au_fset_pin(flags, name) \
+	do { (flags) |= AuPin_##name; } while (0)
+#define au_fclr_pin(flags, name) \
+	do { (flags) &= ~AuPin_##name; } while (0)
 
 struct au_pin {
 	/* input */
@@ -107,7 +109,7 @@ static inline struct au_iinfo *au_ii(struct inode *inode)
 
 /* inode.c */
 struct inode *au_igrab(struct inode *inode);
-int au_refresh_hinode_self(struct inode *inode, int do_attr);
+int au_refresh_hinode_self(struct inode *inode);
 int au_refresh_hinode(struct inode *inode, struct dentry *dentry);
 int au_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 	   unsigned int d_type, ino_t *ino);
@@ -134,8 +136,10 @@ extern struct inode_operations aufs_iop, aufs_symlink_iop, aufs_dir_iop;
 #define AuWrDir_ADD_ENTRY	1
 #define AuWrDir_ISDIR		(1 << 1)
 #define au_ftest_wrdir(flags, name)	((flags) & AuWrDir_##name)
-#define au_fset_wrdir(flags, name)	{ (flags) |= AuWrDir_##name; }
-#define au_fclr_wrdir(flags, name)	{ (flags) &= ~AuWrDir_##name; }
+#define au_fset_wrdir(flags, name) \
+	do { (flags) |= AuWrDir_##name; } while (0)
+#define au_fclr_wrdir(flags, name) \
+	do { (flags) &= ~AuWrDir_##name; } while (0)
 
 struct au_wr_dir_args {
 	aufs_bindex_t force_btgt;
@@ -187,8 +191,10 @@ unsigned int au_hi_flags(struct inode *inode, int isdir);
 #define AuHi_XINO	1
 #define AuHi_HNOTIFY	(1 << 1)
 #define au_ftest_hi(flags, name)	((flags) & AuHi_##name)
-#define au_fset_hi(flags, name)		{ (flags) |= AuHi_##name; }
-#define au_fclr_hi(flags, name)		{ (flags) &= ~AuHi_##name; }
+#define au_fset_hi(flags, name) \
+	do { (flags) |= AuHi_##name; } while (0)
+#define au_fclr_hi(flags, name) \
+	do { (flags) &= ~AuHi_##name; } while (0)
 
 #ifndef CONFIG_AUFS_HNOTIFY
 #undef AuHi_HNOTIFY
@@ -206,9 +212,11 @@ int au_iinfo_init(struct inode *inode);
 void au_iinfo_fin(struct inode *inode);
 int au_ii_realloc(struct au_iinfo *iinfo, int nbr);
 
+#ifdef CONFIG_PROC_FS
 /* plink.c */
-void au_plink_maint_block(struct super_block *sb);
-void au_plink_maint_leave(struct file *file);
+int au_plink_maint(struct super_block *sb, int flags);
+void au_plink_maint_leave(struct au_sbinfo *sbinfo);
+int au_plink_maint_enter(struct super_block *sb);
 #ifdef CONFIG_AUFS_DEBUG
 void au_plink_list(struct super_block *sb);
 #else
@@ -218,9 +226,23 @@ int au_plink_test(struct inode *inode);
 struct dentry *au_plink_lkup(struct inode *inode, aufs_bindex_t bindex);
 void au_plink_append(struct inode *inode, aufs_bindex_t bindex,
 		     struct dentry *h_dentry);
-void au_plink_put(struct super_block *sb);
+void au_plink_put(struct super_block *sb, int verbose);
+void au_plink_clean(struct super_block *sb, int verbose);
 void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id);
-long au_plink_ioctl(struct file *file, unsigned int cmd);
+#else
+AuStubInt0(au_plink_maint, struct super_block *sb, int flags);
+AuStubVoid(au_plink_maint_leave, struct au_sbinfo *sbinfo);
+AuStubInt0(au_plink_maint_enter, struct super_block *sb);
+AuStubVoid(au_plink_list, struct super_block *sb);
+AuStubInt0(au_plink_test, struct inode *inode);
+AuStub(struct dentry *, au_plink_lkup, return NULL,
+       struct inode *inode, aufs_bindex_t bindex);
+AuStubVoid(au_plink_append, struct inode *inode, aufs_bindex_t bindex,
+	   struct dentry *h_dentry);
+AuStubVoid(au_plink_put, struct super_block *sb, int verbose);
+AuStubVoid(au_plink_clean, struct super_block *sb, int verbose);
+AuStubVoid(au_plink_half_refresh, struct super_block *sb, aufs_bindex_t br_id);
+#endif /* CONFIG_PROC_FS */
 
 /* ---------------------------------------------------------------------- */
 
@@ -283,6 +305,13 @@ AuSimpleUnlockRwsemFuncs(ii, struct inode *i, &au_ii(i)->ii_rwsem);
 
 /* ---------------------------------------------------------------------- */
 
+static inline void au_icntnr_init(struct au_icntnr *c)
+{
+#ifdef CONFIG_AUFS_DEBUG
+	c->vfs_inode.i_mode = 0;
+#endif
+}
+
 static inline unsigned int au_iigen(struct inode *inode)
 {
 	return atomic_read(&au_ii(inode)->ii_generation);
@@ -302,9 +331,18 @@ static inline int au_test_higen(struct inode *inode, struct inode *h_inode)
 
 static inline void au_iigen_dec(struct inode *inode)
 {
-#ifdef CONFIG_AUFS_HNOTIFY
-	atomic_dec_return(&au_ii(inode)->ii_generation);
-#endif
+	atomic_dec(&au_ii(inode)->ii_generation);
+}
+
+static inline int au_iigen_test(struct inode *inode, unsigned int sigen)
+{
+	int err;
+
+	err = 0;
+	if (unlikely(inode && au_iigen(inode) != sigen))
+		err = -EIO;
+
+	return err;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -397,12 +435,10 @@ static inline void au_pin_set_parent_lflag(struct au_pin *pin,
 					   unsigned char lflag)
 {
 	if (pin) {
-		/* dirty macros require brackets */
-		if (lflag) {
+		if (lflag)
 			au_fset_pin(pin->flags, DI_LOCKED);
-		} else {
+		else
 			au_fclr_pin(pin->flags, DI_LOCKED);
-		}
 	}
 }
 
@@ -416,24 +452,31 @@ static inline void au_pin_set_parent(struct au_pin *pin, struct dentry *parent)
 
 /* ---------------------------------------------------------------------- */
 
+struct au_branch;
 #ifdef CONFIG_AUFS_HNOTIFY
 struct au_hnotify_op {
 	void (*ctl)(struct au_hinode *hinode, int do_set);
-	int (*alloc)(struct au_hnotify *hn, struct inode *h_inode);
-	void (*free)(struct au_hnotify *hn);
+	int (*alloc)(struct au_hinode *hinode);
+	void (*free)(struct au_hinode *hinode);
 
 	void (*fin)(void);
 	int (*init)(void);
+
+	int (*reset_br)(unsigned int udba, struct au_branch *br, int perm);
+	void (*fin_br)(struct au_branch *br);
+	int (*init_br)(struct au_branch *br, int perm);
 };
 
 /* hnotify.c */
-int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
-		struct inode *h_inode);
+int au_hn_alloc(struct au_hinode *hinode, struct inode *inode);
 void au_hn_free(struct au_hinode *hinode);
 void au_hn_ctl(struct au_hinode *hinode, int do_set);
 void au_hn_reset(struct inode *inode, unsigned int flags);
 int au_hnotify(struct inode *h_dir, struct au_hnotify *hnotify, u32 mask,
 	       struct qstr *h_child_qstr, struct inode *h_child_inode);
+int au_hnotify_reset_br(unsigned int udba, struct au_branch *br, int perm);
+int au_hnotify_init_br(struct au_branch *br, int perm);
+void au_hnotify_fin_br(struct au_branch *br);
 int __init au_hnotify_init(void);
 void au_hnotify_fin(void);
 
@@ -449,8 +492,7 @@ void au_hn_init(struct au_hinode *hinode)
 #else
 static inline
 int au_hn_alloc(struct au_hinode *hinode __maybe_unused,
-		struct inode *inode __maybe_unused,
-		struct inode *h_inode __maybe_unused)
+		struct inode *inode __maybe_unused)
 {
 	return -EOPNOTSUPP;
 }
@@ -460,6 +502,12 @@ AuStubVoid(au_hn_ctl, struct au_hinode *hinode __maybe_unused,
 	   int do_set __maybe_unused)
 AuStubVoid(au_hn_reset, struct inode *inode __maybe_unused,
 	   unsigned int flags __maybe_unused)
+AuStubInt0(au_hnotify_reset_br, unsigned int udba __maybe_unused,
+	   struct au_branch *br __maybe_unused,
+	   int perm __maybe_unused)
+AuStubInt0(au_hnotify_init_br, struct au_branch *br __maybe_unused,
+	   int perm __maybe_unused)
+AuStubVoid(au_hnotify_fin_br, struct au_branch *br __maybe_unused)
 AuStubInt0(__init au_hnotify_init, void)
 AuStubVoid(au_hnotify_fin, void)
 AuStubVoid(au_hn_init, struct au_hinode *hinode __maybe_unused)

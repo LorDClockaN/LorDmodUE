@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,18 @@ struct super_block;
 	(flags) &= ~AuOptMask_UDBA; \
 	((flags) |= AuOpt_##name); \
 } while (0)
-#define au_opt_clr(flags, name)		{ ((flags) &= ~AuOpt_##name); }
+#define au_opt_clr(flags, name) do { \
+	((flags) &= ~AuOpt_##name); \
+} while (0)
+
+static inline unsigned int au_opts_plink(unsigned int mntflags)
+{
+#ifdef CONFIG_PROC_FS
+	return mntflags;
+#else
+	return mntflags & ~AuOpt_PLINK;
+#endif
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -159,13 +170,14 @@ struct au_opt {
 
 /* opts flags */
 #define AuOpts_REMOUNT		1
-#define AuOpts_REFRESH_DIR	(1 << 1)
-#define AuOpts_REFRESH_NONDIR	(1 << 2)
-#define AuOpts_TRUNC_XIB	(1 << 3)
-#define AuOpts_REFRESH_DYAOP	(1 << 4)
+#define AuOpts_REFRESH		(1 << 1)
+#define AuOpts_TRUNC_XIB	(1 << 2)
+#define AuOpts_REFRESH_DYAOP	(1 << 3)
 #define au_ftest_opts(flags, name)	((flags) & AuOpts_##name)
-#define au_fset_opts(flags, name)	{ (flags) |= AuOpts_##name; }
-#define au_fclr_opts(flags, name)	{ (flags) &= ~AuOpts_##name; }
+#define au_fset_opts(flags, name) \
+	do { (flags) |= AuOpts_##name; } while (0)
+#define au_fclr_opts(flags, name) \
+	do { (flags) &= ~AuOpts_##name; } while (0)
 
 struct au_opts {
 	struct au_opt	*opt;

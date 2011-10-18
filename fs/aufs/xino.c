@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -102,12 +102,15 @@ ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 	ssize_t err;
 
 	/* todo: signal block and no wkq? */
-	/* todo: new credential scheme */
-	/*
-	 * it breaks RLIMIT_FSIZE and normal user's limit,
-	 * users should care about quota and real 'filesystem full.'
-	 */
-	if (!au_test_wkq(current)) {
+	if (rlimit(RLIMIT_FSIZE) == RLIM_INFINITY) {
+		lockdep_off();
+		err = do_xino_fwrite(func, file, buf, size, pos);
+		lockdep_on();
+	} else {
+		/*
+		 * it breaks RLIMIT_FSIZE and normal user's limit,
+		 * users should care about quota and real 'filesystem full.'
+		 */
 		int wkq_err;
 		struct do_xino_fwrite_args args = {
 			.errp	= &err,
@@ -121,8 +124,7 @@ ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
 		wkq_err = au_wkq_wait(call_do_xino_fwrite, &args);
 		if (unlikely(wkq_err))
 			err = wkq_err;
-	} else
-		err = do_xino_fwrite(func, file, buf, size, pos);
+	}
 
 	return err;
 }
@@ -189,12 +191,12 @@ struct file *au_xino_create2(struct file *base_file, struct file *copy_src)
 	}
 	goto out_dput; /* success */
 
- out_fput:
+out_fput:
 	fput(file);
 	file = ERR_PTR(err);
- out_dput:
+out_dput:
 	dput(path.dentry);
- out:
+out:
 	return file;
 }
 
@@ -280,7 +282,7 @@ int au_xino_trunc(struct super_block *sb, aufs_bindex_t bindex)
 		get_file(new_xino);
 	}
 
- out:
+out:
 	return err;
 }
 
@@ -317,8 +319,8 @@ static void xino_do_trunc(void *_args)
 		pr_warning("err b%d, (%d)\n", bindex, err);
 	atomic_dec(&br->br_xino_running);
 	atomic_dec(&br->br_count);
-	au_nwt_done(&au_sbi(sb)->si_nowait);
 	si_write_unlock(sb);
+	au_nwt_done(&au_sbi(sb)->si_nowait);
 	kfree(args);
 }
 
@@ -341,7 +343,7 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 		goto out_args;
 	}
 
-	atomic_inc_return(&br->br_count);
+	atomic_inc(&br->br_count);
 	args->sb = sb;
 	args->br = br;
 	wkq_err = au_wkq_nowait(xino_do_trunc, args, sb);
@@ -349,12 +351,12 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 		return; /* success */
 
 	pr_err("wkq %d\n", wkq_err);
-	atomic_dec_return(&br->br_count);
+	atomic_dec(&br->br_count);
 
- out_args:
+out_args:
 	kfree(args);
- out:
-	atomic_dec_return(&br->br_xino_running);
+out:
+	atomic_dec(&br->br_xino_running);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -475,7 +477,7 @@ static int xib_pindex(struct super_block *sb, unsigned long pindex)
 		return 0; /* success */
 	}
 
- out:
+out:
 	AuIOErr1("write failed (%zd)\n", sz);
 	err = sz;
 	if (sz >= 0)
@@ -608,15 +610,15 @@ ino_t au_xino_new_ino(struct super_block *sb)
 	}
 	BUG();
 
- out:
+out:
 	set_bit(free_bit, p);
-	sbinfo->si_xib_next_bit++;
+	sbinfo->si_xib_next_bit = free_bit + 1;
 	pindex = sbinfo->si_xib_last_pindex;
 	mutex_unlock(&sbinfo->si_xib_mtx);
 	ino = xib_calc_ino(pindex, free_bit);
 	AuDbg("i%lu\n", (unsigned long)ino);
 	return ino;
- out_err:
+out_err:
 	mutex_unlock(&sbinfo->si_xib_mtx);
 	AuDbg("i0\n");
 	return 0;
@@ -719,7 +721,7 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 	}
 	return file; /* success */
 
- out:
+out:
 	fput(file);
 	file = ERR_PTR(err);
 	return file;
@@ -794,11 +796,12 @@ int au_xino_br(struct super_block *sb, struct au_branch *br, ino_t h_ino,
 	ino = AUFS_ROOT_INO;
 	err = au_xino_do_write(au_sbi(sb)->si_xwrite, br->br_xino.xi_file,
 			       h_ino, ino);
-	if (!err)
-		return 0; /* success */
+	if (unlikely(err)) {
+		fput(br->br_xino.xi_file);
+		br->br_xino.xi_file = NULL;
+	}
 
-
- out:
+out:
 	return err;
 }
 
@@ -846,7 +849,7 @@ static int do_xib_restore(struct super_block *sb, struct file *file, void *page)
 		}
 	}
 
- out:
+out:
 	return err;
 }
 
@@ -871,7 +874,7 @@ static int xib_restore(struct super_block *sb)
 			AuDbg("b%d\n", bindex);
 	free_page((unsigned long)page);
 
- out:
+out:
 	return err;
 }
 
@@ -1013,17 +1016,17 @@ static int au_xino_set_xib(struct super_block *sb, struct file *base)
 	err = 0;
 	goto out; /* success */
 
- out_free:
+out_free:
 	free_page((unsigned long)sbinfo->si_xib_buf);
 	sbinfo->si_xib_buf = NULL;
 	if (err >= 0)
 		err = -EIO;
- out_unset:
+out_unset:
 	fput(sbinfo->si_xib);
 	sbinfo->si_xib = NULL;
 	sbinfo->si_xread = NULL;
 	sbinfo->si_xwrite = NULL;
- out:
+out:
 	return err;
 }
 
@@ -1101,14 +1104,14 @@ static int au_xino_set_br(struct super_block *sb, struct file *base)
 		br->br_xino.xi_file = p->new;
 	}
 
- out_pair:
+out_pair:
 	for (bindex = 0, p = fpair; bindex <= bend; bindex++, p++)
 		if (p->new)
 			fput(p->new);
 		else
 			break;
 	kfree(fpair);
- out:
+out:
 	return err;
 }
 
@@ -1171,7 +1174,7 @@ int au_xino_set(struct super_block *sb, struct au_opt_xino *xino, int remount)
 	/* reset all */
 	AuIOErr("failed creating xino(%d).\n", err);
 
- out:
+out:
 	dput(parent);
 	return err;
 }
@@ -1234,7 +1237,7 @@ struct file *au_xino_def(struct super_block *sb)
 			au_xino_brid_set(sb, -1);
 	}
 
- out:
+out:
 	return file;
 }
 
@@ -1255,6 +1258,6 @@ int au_xino_path(struct seq_file *seq, struct file *file)
 			 sizeof(Deleted) - 1));
 #undef Deleted
 
- out:
+out:
 	return err;
 }

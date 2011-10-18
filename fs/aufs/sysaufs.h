@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ struct sysaufs_si_attr {
 
 /* sysaufs.c */
 extern unsigned long sysaufs_si_mask;
-extern struct kset *sysaufs_ket;
+extern struct kset *sysaufs_kset;
 extern struct attribute *sysaufs_si_attrs[];
 int sysaufs_si_init(struct au_sbinfo *sbinfo);
 int __init sysaufs_init(void);

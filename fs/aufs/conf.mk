@@ -7,7 +7,8 @@ AuConfStr += ${1}=${${1}}
 endif
 endef
 
-$(foreach i, BRANCH_MAX_127 BRANCH_MAX_511 BRANCH_MAX_1023 BRANCH_MAX_32767 \
+AuConfAll = BRANCH_MAX_127 BRANCH_MAX_511 BRANCH_MAX_1023 BRANCH_MAX_32767 \
+	SBILIST \
 	HNOTIFY HFSNOTIFY HINOTIFY \
 	EXPORT INO_T_64 \
 	RDU \
@@ -17,7 +18,8 @@ $(foreach i, BRANCH_MAX_127 BRANCH_MAX_511 BRANCH_MAX_1023 BRANCH_MAX_32767 \
 	BR_FUSE POLL \
 	BR_HFSPLUS \
 	BDEV_LOOP \
-	DEBUG MAGIC_SYSRQ, \
+	DEBUG MAGIC_SYSRQ
+$(foreach i, ${AuConfAll}, \
 	$(eval $(call AuConf,CONFIG_AUFS_${i})))
 
 AuConfName = ${obj}/conf.str
@@ -31,3 +33,5 @@ ${AuConfName}: ${AuConfName}.tmp
 FORCE:
 clean-files += ${AuConfName} ${AuConfName}.tmp
 ${obj}/sysfs.o: ${AuConfName}
+
+-include ${srctree}/${src}/conf_priv.mk
