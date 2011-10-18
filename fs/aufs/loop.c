@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,12 +50,13 @@ int au_test_loopback_overlap(struct super_block *sb, struct dentry *h_adding)
 int au_test_loopback_kthread(void)
 {
 	int ret;
+	struct task_struct *tsk = current;
 
 	ret = 0;
-	if (current->flags & PF_KTHREAD) {
-		const char c = current->comm[4];
+	if (tsk->flags & PF_KTHREAD) {
+		const char c = tsk->comm[4];
 		ret = ('0' <= c && c <= '9'
-		       && !strncmp(current->comm, "loop", 4));
+		       && !strncmp(tsk->comm, "loop", 4));
 	}
 
 	return ret;

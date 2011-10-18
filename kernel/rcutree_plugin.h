@@ -58,7 +58,7 @@ static void __init rcu_bootup_announce_oddness(void)
 	printk(KERN_INFO
 	       "\tRCU-based detection of stalled CPUs is disabled.\n");
 #endif
-#ifndef CONFIG_RCU_CPU_STALL_VERBOSE
+#if defined(CONFIG_TREE_PREEMPT_RCU) && !defined(CONFIG_RCU_CPU_STALL_VERBOSE)
 	printk(KERN_INFO "\tVerbose stalled-CPUs detection is disabled.\n");
 #endif
 #if NUM_RCU_LVL_4 != 0
@@ -418,6 +418,16 @@ static void rcu_print_task_stall(struct rcu_node *rnp)
 	}
 }
 
+/*
+ * Suppress preemptible RCU's CPU stall warnings by pushing the
+ * time of the next stall-warning message comfortably far into the
+ * future.
+ */
+static void rcu_preempt_stall_reset(void)
+{
+	rcu_preempt_state.jiffies_stall = jiffies + ULONG_MAX / 2;
+}
+
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
 
 /*
@@ -547,9 +557,11 @@ EXPORT_SYMBOL_GPL(call_rcu);
  *
  * Control will return to the caller some time after a full grace
  * period has elapsed, in other words after all currently executing RCU
- * read-side critical sections have completed.  RCU read-side critical
- * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
- * and may be nested.
+ * read-side critical sections have completed.  Note, however, that
+ * upon return from synchronize_rcu(), the caller might well be executing
+ * concurrently with new RCU read-side critical sections that began while
+ * synchronize_rcu() was waiting.  RCU read-side critical sections are
+ * delimited by rcu_read_lock() and rcu_read_unlock(), and may be nested.
  */
 void synchronize_rcu(void)
 {
@@ -863,6 +875,14 @@ static void rcu_print_detail_task_stall(struct rcu_state *rsp)
  * tasks blocked within RCU read-side critical sections.
  */
 static void rcu_print_task_stall(struct rcu_node *rnp)
+{
+}
+
+/*
+ * Because preemptible RCU does not exist, there is no need to suppress
+ * its CPU stall warnings.
+ */
+static void rcu_preempt_stall_reset(void)
 {
 }
 

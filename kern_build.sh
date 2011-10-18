@@ -1,18 +1,22 @@
 #! /bin/bash
 
 # chrooted gentoo on DesireHD.
+# if toolchain use, type `CROSS_COMPILE="...." ./kern_build.sh'
 
+myname="$(basename $0 .sh)"
+def_config=lordmodaufs_defconfig
+
+build_dir="$(readlink -f ../build)"
 cpuinfo=$(grep -i processor /proc/cpuinfo | wc -l)
 git_repo=$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/*\s//g')
-obj_dir="$(readlink -f ..)/build/${git_repo}/obj"
-finished="$(readlink -f ..)/build/${git_repo}/finished"
-anykernel_dir="$(readlink -f ..)/build/AnyKernel"
-def_config=lordmodaufs_defconfig
+obj_dir="${build_dir}/${git_repo}/obj"
+finished="${build_dir}/${git_repo}/finished"
+anykernel_dir="${build_dir}/AnyKernel"
 
 ARCH=${ARCH:=arm}
 CROSS_COMPILE=${CROSS_COMPILE:=}
 EXTRA_AFLAGS="-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block"
-LOG="$(readlink -f ..)/build/${git_repo}/$(basename $0 .sh).log"
+LOG="${build_dir}/${git_repo}/${myname}.log"
 
 die() {
     echo -e "\033[1;30m>\033[0;31m>\033[1;31m> ERROR:\033[0m ${@}"
@@ -36,18 +40,19 @@ dexec () {
 config_kernel ()
 {
 	einfo "Configure kernel"
-	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
+	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		O=${obj_dir} $def_config
-	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
+	make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		O=${obj_dir} menuconfig
 	die "Interrupt compile"
 }
 
 compile_kernel () {
 	einfo "Compile kernel"
-    einfo " * you can read log: tail -f $LOG"
+    	einfo " * you can read log: tail -f $LOG"
+	ewarn " * make oldconfig"
+	make ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+		O=${obj_dir} oldconfig
 	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
 		KERNEL_DIR=$KERNEL_DIR \
 		EXTRA_AFLAGS=\'$EXTRA_AFLAGS\' \
@@ -83,7 +88,7 @@ install_kernel () {
 	einfo "Setup Anykernel"
 	setup_anykernel
 	dt=$(date +%Y%m%d%H%M)
-	zipedf="update-${dt}.zip"
+	zipedf="update_${git_repo}_${dt}.zip"
 
 	einfo "Install packages [$zipedf]"
 	find ${obj_dir}/arch/${ARCH} -name zImage -exec install -D {} ${finished}/kernel/zImage \;
@@ -98,24 +103,44 @@ install_kernel () {
 	)
 }
 
-# -- start script
-
-test -d ${obj_dir} || install -d ${obj_dir}
-test -f ${obj_dir}/.config || config_kernel
-test -f ${LOG} && rm -f ${LOG}
-
-if [ -d .git ]; then
-	KERNEL_DIR=$(readlink -f $(dirname .))
-	einfo "Git Repository: $git_repo"
-
+clean () {
 	einfo "Clean-up old modules"
 	test -d ${finished}/system/lib/modules && dexec rm -f ${finished}/system/lib/modules/*
 	test -d ${finished}/kernel/zImage && dexec rm -f ${finished}/kernel/zImage
-	dexec find ${obj_dir} -name "*.ko" | xargs rm -f
+	dexec make -j${cpuinfo} ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+		KERNEL_DIR=$KERNEL_DIR \
+		O=${obj_dir} clean
+}
 
-	compile_kernel
-	install_kernel
-	
+usage () {
+	echo "usage: $(basename $0) [all | compile | install |clean]"
+	exit 0
+}
+
+# -- start script
+
+test "$#" = 0 && usage
+test -f ${LOG} && rm -f ${LOG}
+
+if [ -d .git ]; then
+	einfo "Git Repository: $git_repo"
+	KERNEL_DIR=$(readlink -f $(dirname .))
+	test -d ${obj_dir} || install -d ${obj_dir}
+	test -f ${obj_dir}/.config || config_kernel
+
+	case "$1" in
+	all)
+		clean && compile_kernel && install_kernel;;
+	compile)
+		compile_kernel;;
+	install)
+		install_kernel;;
+	clean)
+		clean;;
+	*)
+		echo "invalid argument: $1"
+		usage;;
+	esac
 else
 	ewarn "not in git repository"
 fi

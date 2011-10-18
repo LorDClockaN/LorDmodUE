@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 /* #include <linux/kernel.h> */
 #include <linux/delay.h>
 /* #include <linux/kd.h> */
-/* #include <linux/vt_kern.h> */
+#include <linux/vt_kern.h>
 #include <linux/sysrq.h>
 #include <linux/aufs_type.h>
 
@@ -123,6 +123,7 @@ struct au_vdir;
 void au_dpri_vdir(struct au_vdir *vdir);
 struct inode;
 void au_dpri_inode(struct inode *inode);
+void au_dpri_dalias(struct inode *inode);
 void au_dpri_dentry(struct dentry *dentry);
 struct file;
 void au_dpri_file(struct file *filp);
@@ -133,10 +134,13 @@ void au_dbg_sleep_jiffy(int jiffy);
 struct iattr;
 void au_dbg_iattr(struct iattr *ia);
 
+#define au_dbg_verify_dinode(d) __au_dbg_verify_dinode(d, __func__, __LINE__)
+void __au_dbg_verify_dinode(struct dentry *dentry, const char *func, int line);
 void au_dbg_verify_dir_parent(struct dentry *dentry, unsigned int sigen);
 void au_dbg_verify_nondir_parent(struct dentry *dentry, unsigned int sigen);
 void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen);
 void au_dbg_verify_kthread(void);
+void au_dbg_verify_wkq(void);
 
 int __init au_debug_init(void);
 void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
@@ -153,6 +157,11 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 #define AuDbgInode(i) do { \
 	AuDbg(#i "\n"); \
 	au_dpri_inode(i); \
+} while (0)
+
+#define AuDbgDAlias(i) do { \
+	AuDbg(#i "\n"); \
+	au_dpri_dalias(i); \
 } while (0)
 
 #define AuDbgDentry(d) do { \
@@ -197,17 +206,20 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	AuInfo("%s\n", sym);				\
 } while (0)
 #else
+AuStubVoid(au_dbg_verify_dinode, struct dentry *dentry)
 AuStubVoid(au_dbg_verify_dir_parent, struct dentry *dentry, unsigned int sigen)
 AuStubVoid(au_dbg_verify_nondir_parent, struct dentry *dentry,
 	   unsigned int sigen)
 AuStubVoid(au_dbg_verify_gen, struct dentry *parent, unsigned int sigen)
 AuStubVoid(au_dbg_verify_kthread, void)
+AuStubVoid(au_dbg_verify_wkq, void)
 AuStubInt0(__init au_debug_init, void)
 AuStubVoid(au_debug_sbinfo_init, struct au_sbinfo *sbinfo)
 
 #define AuDbgWhlist(w)		do {} while (0)
 #define AuDbgVdir(v)		do {} while (0)
 #define AuDbgInode(i)		do {} while (0)
+#define AuDbgDAlias(i)		do {} while (0)
 #define AuDbgDentry(d)		do {} while (0)
 #define AuDbgFile(f)		do {} while (0)
 #define AuDbgSb(sb)		do {} while (0)

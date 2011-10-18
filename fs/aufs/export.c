@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -163,7 +163,7 @@ int au_xigen_new(struct inode *inode)
 		AuIOErr("xigen error (%zd)\n", sz);
 	}
 
- out:
+out:
 	return err;
 }
 
@@ -185,7 +185,7 @@ int au_xigen_set(struct super_block *sb, struct file *base)
 		fput(sbinfo->si_xigen);
 	sbinfo->si_xigen = file;
 
- out:
+out:
 	return err;
 }
 
@@ -236,14 +236,16 @@ static struct dentry *decode_by_ino(struct super_block *sb, ino_t ino,
 			}
 		spin_unlock(&dcache_lock);
 	}
-	if (unlikely(dentry && sigen != au_digen(dentry))) {
+	if (unlikely(dentry && au_digen_test(dentry, sigen))) {
+		/* need to refresh */
 		dput(dentry);
-		dentry = ERR_PTR(-ESTALE);
+		dentry = NULL;
 	}
 
- out_iput:
+out_iput:
 	iput(inode);
- out:
+out:
+	AuTraceErrPtr(dentry);
 	return dentry;
 }
 
@@ -278,11 +280,13 @@ static struct vfsmount *au_mnt_get(struct super_block *sb)
 	};
 	struct mnt_namespace *ns;
 
+	spin_lock(&vfsmount_lock);
 	/* no get/put ?? */
 	AuDebugOn(!current->nsproxy);
 	ns = current->nsproxy->mnt_ns;
 	AuDebugOn(!ns);
 	err = iterate_mounts(au_compare_mnt, &args, ns->root);
+	spin_unlock(&vfsmount_lock);
 	AuDebugOn(!err);
 	AuDebugOn(!args.mnt);
 	return args.mnt;
@@ -290,28 +294,32 @@ static struct vfsmount *au_mnt_get(struct super_block *sb)
 
 struct au_nfsd_si_lock {
 	unsigned int sigen;
-	aufs_bindex_t br_id;
+	aufs_bindex_t bindex, br_id;
 	unsigned char force_lock;
 };
 
-static aufs_bindex_t si_nfsd_read_lock(struct super_block *sb,
-				       struct au_nfsd_si_lock *nsi_lock)
+static int si_nfsd_read_lock(struct super_block *sb,
+			     struct au_nfsd_si_lock *nsi_lock)
 {
+	int err;
 	aufs_bindex_t bindex;
 
 	si_read_lock(sb, AuLock_FLUSH);
 
 	/* branch id may be wrapped around */
+	err = 0;
 	bindex = au_br_index(sb, nsi_lock->br_id);
 	if (bindex >= 0 && nsi_lock->sigen + AUFS_BRANCH_MAX > au_sigen(sb))
 		goto out; /* success */
 
+	err = -ESTALE;
+	bindex = -1;
 	if (!nsi_lock->force_lock)
 		si_read_unlock(sb);
-	bindex = -1;
 
- out:
-	return bindex;
+out:
+	nsi_lock->bindex = bindex;
+	return err;
 }
 
 struct find_name_by_ino {
@@ -386,11 +394,11 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino,
 		dentry = ERR_PTR(-ENOENT);
 	}
 
- out_name:
+out_name:
 	__putname(arg.name);
- out_file:
+out_file:
 	fput(file);
- out:
+out:
 	if (unlikely(nsi_lock
 		     && si_nfsd_read_lock(parent->d_sb, nsi_lock) < 0))
 		if (!IS_ERR(dentry)) {
@@ -421,7 +429,7 @@ static struct dentry *decode_by_dir_ino(struct super_block *sb, ino_t ino,
 	dentry = au_lkup_by_ino(&path, ino, nsi_lock);
 	path_put(&path);
 
- out:
+out:
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
@@ -462,15 +470,14 @@ static char *au_build_path(struct dentry *h_parent, struct path *h_rootpath,
 	if (n != 1)
 		p[strlen(p)] = '/';
 
- out:
+out:
 	AuTraceErrPtr(p);
 	return p;
 }
 
 static
-struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
-			      ino_t ino, __u32 *fh, int fh_len,
-			      struct au_nfsd_si_lock *nsi_lock)
+struct dentry *decode_by_path(struct super_block *sb, ino_t ino, __u32 *fh,
+			      int fh_len, struct au_nfsd_si_lock *nsi_lock)
 {
 	struct dentry *dentry, *h_parent, *root;
 	struct super_block *h_sb;
@@ -480,8 +487,7 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 	int err;
 	struct path path;
 
-	br = au_sbr(sb, bindex);
-	/* au_br_get(br); */
+	br = au_sbr(sb, nsi_lock->bindex);
 	h_mnt = br->br_mnt;
 	h_sb = h_mnt->mnt_sb;
 	/* todo: call lower fh_to_dentry()? fh_to_parent()? */
@@ -509,7 +515,7 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 	root = sb->s_root;
 	path.mnt = h_mnt;
 	di_read_lock_parent(root, !AuLock_IR);
-	path.dentry = au_h_dptr(root, bindex);
+	path.dentry = au_h_dptr(root, nsi_lock->bindex);
 	di_read_unlock(root, !AuLock_IR);
 	p = au_build_path(h_parent, &path, pathname, PAGE_SIZE, sb);
 	dentry = (void *)p;
@@ -532,20 +538,19 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 	else
 		dentry = dget(path.dentry);
 
- out_path:
+out_path:
 	path_put(&path);
- out_relock:
+out_relock:
 	if (unlikely(si_nfsd_read_lock(sb, nsi_lock) < 0))
 		if (!IS_ERR(dentry)) {
 			dput(dentry);
 			dentry = ERR_PTR(-ESTALE);
 		}
- out_pathname:
+out_pathname:
 	free_page((unsigned long)pathname);
- out_h_parent:
+out_h_parent:
 	dput(h_parent);
- out:
-	/* au_br_put(br); */
+out:
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
@@ -558,8 +563,8 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 {
 	struct dentry *dentry;
 	__u32 *fh = fid->raw;
+	struct au_branch *br;
 	ino_t ino, dir_ino;
-	aufs_bindex_t bindex;
 	struct au_nfsd_si_lock nsi_lock = {
 		.force_lock	= 0
 	};
@@ -572,8 +577,8 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 	nsi_lock.br_id = fh[Fh_br_id];
 
 	/* branch id may be wrapped around */
-	bindex = si_nfsd_read_lock(sb, &nsi_lock);
-	if (unlikely(bindex < 0))
+	br = NULL;
+	if (unlikely(si_nfsd_read_lock(sb, &nsi_lock)))
 		goto out;
 	nsi_lock.force_lock = 1;
 
@@ -591,6 +596,8 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 		goto accept;
 
 	/* is the parent dir cached? */
+	br = au_sbr(sb, nsi_lock.bindex);
+	atomic_inc(&br->br_count);
 	dentry = decode_by_dir_ino(sb, ino, dir_ino, &nsi_lock);
 	if (IS_ERR(dentry))
 		goto out_unlock;
@@ -598,22 +605,25 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 		goto accept;
 
 	/* lookup path */
-	dentry = decode_by_path(sb, bindex, ino, fh, fh_len, &nsi_lock);
+	dentry = decode_by_path(sb, ino, fh, fh_len, &nsi_lock);
 	if (IS_ERR(dentry))
 		goto out_unlock;
 	if (unlikely(!dentry))
 		/* todo?: make it ESTALE */
 		goto out_unlock;
 
- accept:
-	if (dentry->d_inode->i_generation == fh[Fh_igen])
+accept:
+	if (!au_digen_test(dentry, au_sigen(sb))
+	    && dentry->d_inode->i_generation == fh[Fh_igen])
 		goto out_unlock; /* success */
 
 	dput(dentry);
 	dentry = ERR_PTR(-ESTALE);
- out_unlock:
+out_unlock:
+	if (br)
+		atomic_dec(&br->br_count);
 	si_read_unlock(sb);
- out:
+out:
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
@@ -635,7 +645,7 @@ static struct dentry *aufs_fh_to_parent(struct super_block *sb, struct fid *fid,
 		parent = decode_by_path(sb, au_br_index(sb, fh[Fh_br_id]),
 					dir_ino, fh, fh_len);
 
- out:
+out:
 	AuTraceErrPtr(parent);
 	return parent;
 }
@@ -668,19 +678,21 @@ static int aufs_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 		goto out;
 	}
 
-	err = -EIO;
 	h_parent = NULL;
-	sb = dentry->d_sb;
-	aufs_read_lock(dentry, AuLock_FLUSH | AuLock_IR);
-	parent = dget_parent(dentry);
-	di_read_lock_parent(parent, !AuLock_IR);
+	err = aufs_read_lock(dentry, AuLock_FLUSH | AuLock_IR | AuLock_GEN);
+	if (unlikely(err))
+		goto out;
+
 	inode = dentry->d_inode;
 	AuDebugOn(!inode);
+	sb = dentry->d_sb;
 #ifdef CONFIG_AUFS_DEBUG
 	if (unlikely(!au_opt_test(au_mntflags(sb), XINO)))
 		AuWarn1("NFS-exporting requires xino\n");
 #endif
-
+	err = -EIO;
+	parent = dget_parent(dentry);
+	di_read_lock_parent(parent, !AuLock_IR);
 	bend = au_dbtaildir(parent);
 	for (bindex = au_dbstart(parent); bindex <= bend; bindex++) {
 		h_parent = au_h_dptr(parent, bindex);
@@ -718,13 +730,13 @@ static int aufs_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 	else
 		AuWarn1("%s encode_fh failed\n", au_sbtype(h_sb));
 
- out_dput:
+out_dput:
 	dput(h_parent);
- out_unlock:
+out_unlock:
 	di_read_unlock(parent, !AuLock_IR);
 	dput(parent);
 	aufs_read_unlock(dentry, AuLock_IR);
- out:
+out:
 	if (unlikely(err < 0))
 		err = 255;
 	return err;
@@ -741,7 +753,7 @@ static int aufs_commit_metadata(struct inode *inode)
 	int (*f)(struct inode *inode);
 
 	sb = inode->i_sb;
-	si_read_lock(sb, AuLock_FLUSH);
+	si_read_lock(sb, AuLock_FLUSH | AuLock_NOPLMW);
 	ii_write_lock_child(inode);
 	bindex = au_ibstart(inode);
 	AuDebugOn(bindex < 0);

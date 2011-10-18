@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,9 +52,9 @@ int au_dpages_init(struct au_dcsub_pages *dpages, gfp_t gfp)
 	dpages->ndpage = 1;
 	return 0; /* success */
 
- out_dpages:
+out_dpages:
 	kfree(dpages->dpages);
- out:
+out:
 	return err;
 }
 
@@ -98,10 +98,11 @@ static int au_dpages_append(struct au_dcsub_pages *dpages,
 		dpages->ndpage++;
 	}
 
-	dpage->dentries[dpage->ndentry++] = dget(dentry);
+	/* d_count can be zero */
+	dpage->dentries[dpage->ndentry++] = dget_locked(dentry);
 	return 0; /* success */
 
- out:
+out:
 	return err;
 }
 
@@ -115,13 +116,12 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 
 	err = 0;
 	spin_lock(&dcache_lock);
- repeat:
+repeat:
 	next = this_parent->d_subdirs.next;
- resume:
+resume:
 	if (this_parent->d_sb == sb
 	    && !IS_ROOT(this_parent)
-	    && atomic_read(&this_parent->d_count)
-	    && this_parent->d_inode
+	    && au_di(this_parent)
 	    && (!test || test(this_parent, arg))) {
 		err = au_dpages_append(dpages, this_parent, GFP_ATOMIC);
 		if (unlikely(err))
@@ -133,14 +133,12 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 		struct dentry *dentry = list_entry(tmp, struct dentry,
 						   d_u.d_child);
 		next = tmp->next;
-		if (/*d_unhashed(dentry) || */!dentry->d_inode)
-			continue;
 		if (!list_empty(&dentry->d_subdirs)) {
 			this_parent = dentry;
 			goto repeat;
 		}
 		if (dentry->d_sb == sb
-		    && atomic_read(&dentry->d_count)
+		    && au_di(dentry)
 		    && (!test || test(dentry, arg))) {
 			err = au_dpages_append(dpages, dentry, GFP_ATOMIC);
 			if (unlikely(err))
@@ -153,7 +151,7 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 		this_parent = this_parent->d_parent; /* dcache_lock is locked */
 		goto resume;
 	}
- out:
+out:
 	spin_unlock(&dcache_lock);
 	return err;
 }
@@ -179,10 +177,22 @@ int au_dcsub_pages_rev(struct au_dcsub_pages *dpages, struct dentry *dentry,
 		}
 	}
 
- out:
+out:
 	spin_unlock(&dcache_lock);
 
 	return err;
+}
+
+static inline int au_dcsub_dpages_aufs(struct dentry *dentry, void *arg)
+{
+	return au_di(dentry) && dentry->d_sb == arg;
+}
+
+int au_dcsub_pages_rev_aufs(struct au_dcsub_pages *dpages,
+			    struct dentry *dentry, int do_include)
+{
+	return au_dcsub_pages_rev(dpages, dentry, do_include,
+				  au_dcsub_dpages_aufs, dentry->d_sb);
 }
 
 int au_test_subdir(struct dentry *d1, struct dentry *d2)

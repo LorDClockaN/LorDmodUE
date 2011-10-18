@@ -44,6 +44,14 @@ config AUFS_BRANCH_MAX_32767
 	resources and has a minor impact to performance.
 endchoice
 
+config AUFS_SBILIST
+	bool
+	depends on AUFS_MAGIC_SYSRQ || PROC_FS
+	default y
+	help
+	Automatic configuration for internal use.
+	When aufs supports Magic SysRq or /proc, enabled automatically.
+
 config AUFS_HNOTIFY
 	bool "Detect direct branch access (bypassing aufs)"
 	help
@@ -52,7 +60,6 @@ config AUFS_HNOTIFY
 	option and use 'udba=notify' mount option.
 	It will have a negative impact to the performance.
 	See detail in aufs.5.
-
 
 choice
 	prompt "method" if AUFS_HNOTIFY

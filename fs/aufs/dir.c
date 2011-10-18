@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -132,7 +132,7 @@ static int reopen_dir(struct file *file)
 	/* file->f_ra = h_file->f_ra; */
 	err = 0;
 
- out:
+out:
 	return err;
 }
 
@@ -145,8 +145,11 @@ static int do_open_dir(struct file *file, int flags)
 
 	FiMustWriteLock(file);
 
-	err = 0;
 	dentry = file->f_dentry;
+	err = au_alive_dir(dentry);
+	if (unlikely(err))
+		goto out;
+
 	file->f_version = dentry->d_inode->i_version;
 	bindex = au_dbstart(dentry);
 	au_set_fbstart(file, bindex);
@@ -176,6 +179,7 @@ static int do_open_dir(struct file *file, int flags)
 	au_set_fbstart(file, -1);
 	au_set_fbend_dir(file, -1);
 
+out:
 	return err;
 }
 
@@ -189,7 +193,7 @@ static int aufs_open_dir(struct inode *inode __maybe_unused,
 	err = -ENOMEM;
 	sb = file->f_dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
-	fidir = au_fidir_alloc(inode->i_sb);
+	fidir = au_fidir_alloc(sb);
 	if (fidir) {
 		err = au_do_open(file, do_open_dir, fidir);
 		if (unlikely(err))
@@ -203,16 +207,16 @@ static int aufs_release_dir(struct inode *inode __maybe_unused,
 			    struct file *file)
 {
 	struct au_vdir *vdir_cache;
-	struct super_block *sb;
 	struct au_finfo *finfo;
 	struct au_fidir *fidir;
 	aufs_bindex_t bindex, bend;
 
-	au_plink_maint_leave(file);
-	sb = file->f_dentry->d_sb;
 	finfo = au_fi(file);
 	fidir = finfo->fi_hdir;
 	if (fidir) {
+		/* remove me from sb->s_files */
+		file_kill(file);
+
 		vdir_cache = fidir->fd_vdir_cache; /* lock-free */
 		if (vdir_cache)
 			au_vdir_free(vdir_cache);
@@ -334,7 +338,7 @@ static int au_do_fsync_dir(struct file *file, int datasync)
 		}
 	}
 
- out:
+out:
 	return err;
 }
 
@@ -386,12 +390,14 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	err = au_reval_and_lock_fdi(file, reopen_dir, /*wlock*/1);
 	if (unlikely(err))
 		goto out;
-	err = au_vdir_init(file);
+	err = au_alive_dir(dentry);
+	if (!err)
+		err = au_vdir_init(file);
 	di_downgrade_lock(dentry, AuLock_IR);
 	if (unlikely(err))
 		goto out_unlock;
 
-	if (!au_test_nfsd(current)) {
+	if (!au_test_nfsd()) {
 		err = au_vdir_fill_de(file, dirent, filldir);
 		fsstack_copy_attr_atime(inode,
 					au_h_iptr(inode, au_ibstart(inode)));
@@ -412,10 +418,10 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 		return err;
 	}
 
- out_unlock:
+out_unlock:
 	di_read_unlock(dentry, AuLock_IR);
 	fi_write_unlock(file);
- out:
+out:
 	si_read_unlock(sb);
 	return err;
 }
@@ -426,8 +432,10 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 #define AuTestEmpty_CALLED	(1 << 1)
 #define AuTestEmpty_SHWH	(1 << 2)
 #define au_ftest_testempty(flags, name)	((flags) & AuTestEmpty_##name)
-#define au_fset_testempty(flags, name)	{ (flags) |= AuTestEmpty_##name; }
-#define au_fclr_testempty(flags, name)	{ (flags) &= ~AuTestEmpty_##name; }
+#define au_fset_testempty(flags, name) \
+	do { (flags) |= AuTestEmpty_##name; } while (0)
+#define au_fclr_testempty(flags, name) \
+	do { (flags) &= ~AuTestEmpty_##name; } while (0)
 
 #ifndef CONFIG_AUFS_SHWH
 #undef AuTestEmpty_SHWH
@@ -470,7 +478,7 @@ static int test_empty_cb(void *__arg, const char *__name, int namelen,
 			(arg->whlist, name, namelen, ino, d_type, arg->bindex,
 			 au_ftest_testempty(arg->flags, SHWH));
 
- out:
+out:
 	/* smp_mb(); */
 	AuTraceErr(arg->err);
 	return arg->err;
@@ -502,10 +510,10 @@ static int do_test_empty(struct dentry *dentry, struct test_empty_arg *arg)
 			err = arg->err;
 	} while (!err && au_ftest_testempty(arg->flags, CALLED));
 
- out_put:
+out_put:
 	fput(h_file);
 	au_sbr_put(dentry->d_sb, arg->bindex);
- out:
+out:
 	return err;
 }
 
@@ -590,9 +598,9 @@ int au_test_empty_lower(struct dentry *dentry)
 		}
 	}
 
- out_whlist:
+out_whlist:
 	au_nhash_wh_free(&whlist);
- out:
+out:
 	return err;
 }
 
