@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,8 +32,10 @@
 #define	AuRdu_CONT	(1 << 1)
 #define	AuRdu_FULL	(1 << 2)
 #define au_ftest_rdu(flags, name)	((flags) & AuRdu_##name)
-#define au_fset_rdu(flags, name)	{ (flags) |= AuRdu_##name; }
-#define au_fclr_rdu(flags, name)	{ (flags) &= ~AuRdu_##name; }
+#define au_fset_rdu(flags, name) \
+	do { (flags) |= AuRdu_##name; } while (0)
+#define au_fclr_rdu(flags, name) \
+	do { (flags) &= ~AuRdu_##name; } while (0)
 
 struct au_rdu_arg {
 	struct aufs_rdu			*rdu;
@@ -83,7 +85,7 @@ static int au_rdu_fill(void *__arg, const char *name, int nlen,
 		rdu->tail = arg->ent;
 	}
 
- out:
+out:
 	/* AuTraceErr(err); */
 	return err;
 }
@@ -112,7 +114,7 @@ static int au_rdu_do(struct file *h_file, struct au_rdu_arg *arg)
 		 && !au_ftest_rdu(cookie->flags, FULL));
 	cookie->h_pos = h_file->f_pos;
 
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }
@@ -160,12 +162,15 @@ static int au_rdu(struct file *file, struct aufs_rdu *rdu)
 	if (unlikely(err))
 		goto out;
 #endif
-	err = -ENOENT;
-	if (unlikely(IS_DEADDIR(inode)))
-		goto out_mtx;
 
 	arg.sb = inode->i_sb;
-	si_read_lock(arg.sb, AuLock_FLUSH);
+	err = si_read_lock(arg.sb, AuLock_FLUSH | AuLock_NOPLM);
+	if (unlikely(err))
+		goto out_mtx;
+	err = au_alive_dir(dentry);
+	if (unlikely(err))
+		goto out_si;
+	/* todo: reval? */
 	fi_read_lock(file);
 
 	err = -EAGAIN;
@@ -208,12 +213,13 @@ static int au_rdu(struct file *file, struct aufs_rdu *rdu)
 	fsstack_copy_attr_atime(inode, au_h_iptr(inode, au_ibstart(inode)));
 	ii_read_unlock(inode);
 
- out_unlock:
+out_unlock:
 	fi_read_unlock(file);
+out_si:
 	si_read_unlock(arg.sb);
- out_mtx:
+out_mtx:
 	mutex_unlock(&inode->i_mutex);
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }
@@ -323,7 +329,7 @@ long au_rdu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		err = -EINVAL;
 	}
 
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }
@@ -370,7 +376,7 @@ long au_rdu_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		err = -EINVAL;
 	}
 
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }

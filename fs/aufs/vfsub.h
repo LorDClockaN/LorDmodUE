@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,10 @@
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
+#include "debug.h"
+
+/* fs/internal.h */
+extern spinlock_t vfsmount_lock;
 
 /* ---------------------------------------------------------------------- */
 
@@ -47,6 +51,20 @@ enum {
 #define IMustLock(i)		MtxMustLock(&(i)->i_mutex)
 
 /* ---------------------------------------------------------------------- */
+
+
+static inline void vfsub_drop_nlink(struct inode *inode)
+{
+	AuDebugOn(!inode->i_nlink);
+	drop_nlink(inode);
+}
+
+static inline void vfsub_dead_dir(struct inode *inode)
+{
+	AuDebugOn(!S_ISDIR(inode->i_mode));
+	inode->i_flags |= S_DEAD;
+	clear_nlink(inode);
+}
 
 int vfsub_update_h_iattr(struct path *h_path, int *did);
 struct file *vfsub_dentry_open(struct path *path, int flags);

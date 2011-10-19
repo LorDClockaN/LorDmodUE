@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -312,7 +312,7 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len)
 	else
 		free_page((unsigned long)buf);
 
- out:
+out:
 	return err;
 }
 
@@ -367,13 +367,13 @@ static int au_cp_regular(struct dentry *dentry, aufs_bindex_t bdst,
 	IMustLock(file[SRC].dentry->d_inode);
 	err = au_copy_file(file[DST].file, file[SRC].file, len);
 
- out_dst:
+out_dst:
 	fput(file[DST].file);
 	au_sbr_put(sb, file[DST].bindex);
- out_src:
+out_src:
 	fput(file[SRC].file);
 	au_sbr_put(sb, file[SRC].bindex);
- out:
+out:
 	return err;
 }
 
@@ -400,7 +400,7 @@ static int au_do_cpup_regular(struct dentry *dentry, aufs_bindex_t bdst,
 		err = -EIO;
 	}
 
- out:
+out:
 	return err;
 }
 
@@ -435,7 +435,7 @@ static int au_do_cpup_symlink(struct path *h_path, struct dentry *h_src,
 	}
 	__putname(sym.k);
 
- out:
+out:
 	return err;
 }
 
@@ -576,8 +576,9 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 	if (dst_inode) {
 		if (unlikely(!plink)) {
 			err = -EIO;
-			AuIOErr("i%lu exists on a upper branch "
-				"but plink is disabled\n", inode->i_ino);
+			AuIOErr("hi%lu(i%lu) exists on b%d "
+				"but plink is disabled\n",
+				dst_inode->i_ino, inode->i_ino, bdst);
 			goto out;
 		}
 
@@ -591,7 +592,8 @@ static int au_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 			if (unlikely(!h_src->d_inode)) {
 				err = -EIO;
 				AuIOErr("i%lu exists on a upper branch "
-					"but plink is broken\n", inode->i_ino);
+					"but not pseudo-linked\n",
+					inode->i_ino);
 				dput(h_src);
 				goto out;
 			}
@@ -656,7 +658,7 @@ out_rev:
 		err = -EIO;
 	}
 
- out:
+out:
 	dput(dst_parent);
 	return err;
 }
@@ -816,13 +818,15 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	h_d_dst = hdp[0 + bdst].hd_dentry;
 	dinfo->di_bstart = bdst;
 	hdp[0 + bdst].hd_dentry = wh_dentry;
-	h_d_start = hdp[0 + bstart].hd_dentry;
-	if (file)
+	if (file) {
+		h_d_start = hdp[0 + bstart].hd_dentry;
 		hdp[0 + bstart].hd_dentry = au_hf_top(file)->f_dentry;
+	}
 	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME,
 			     /*h_parent*/NULL);
-	if (!err && file) {
-		err = au_reopen_nondir(file);
+	if (file) {
+		if (!err)
+			err = au_reopen_nondir(file);
 		hdp[0 + bstart].hd_dentry = h_d_start;
 	}
 	hdp[0 + bdst].hd_dentry = h_d_dst;
@@ -869,9 +873,9 @@ static int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 	au_dtime_revert(&dt);
 	au_set_hi_wh(dentry->d_inode, bdst, wh_dentry);
 
- out_wh:
+out_wh:
 	dput(wh_dentry);
- out:
+out:
 	dput(parent);
 	return err;
 }
@@ -1017,7 +1021,7 @@ int au_cp_dirs(struct dentry *dentry, aufs_bindex_t bdst,
 			break;
 	}
 
- out:
+out:
 	dput(parent);
 	return err;
 }
@@ -1053,7 +1057,7 @@ int au_test_and_cpup_dirs(struct dentry *dentry, aufs_bindex_t bdst)
 		err = au_cpup_dirs(dentry, bdst);
 	di_downgrade_lock(parent, AuLock_IR);
 
- out:
+out:
 	dput(parent);
 	return err;
 }

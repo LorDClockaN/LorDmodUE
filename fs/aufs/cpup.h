@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,8 +46,10 @@ void au_cpup_attr_all(struct inode *inode, int force);
 #define AuCpup_KEEPLINO	(1 << 1)	/* do not clear the lower xino,
 					   for link(2) */
 #define au_ftest_cpup(flags, name)	((flags) & AuCpup_##name)
-#define au_fset_cpup(flags, name)	{ (flags) |= AuCpup_##name; }
-#define au_fclr_cpup(flags, name)	{ (flags) &= ~AuCpup_##name; }
+#define au_fset_cpup(flags, name) \
+	do { (flags) |= AuCpup_##name; } while (0)
+#define au_fclr_cpup(flags, name) \
+	do { (flags) &= ~AuCpup_##name; } while (0)
 
 int au_copy_file(struct file *dst, struct file *src, loff_t len);
 int au_sio_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,

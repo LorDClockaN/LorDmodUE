@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,8 +55,10 @@ int au_cpdown_attr(struct path *h_path, struct dentry *h_src)
 #define AuCpdown_MADE_DIR	(1 << 2)
 #define AuCpdown_DIROPQ		(1 << 3)
 #define au_ftest_cpdown(flags, name)	((flags) & AuCpdown_##name)
-#define au_fset_cpdown(flags, name)	{ (flags) |= AuCpdown_##name; }
-#define au_fclr_cpdown(flags, name)	{ (flags) &= ~AuCpdown_##name; }
+#define au_fset_cpdown(flags, name) \
+	do { (flags) |= AuCpdown_##name; } while (0)
+#define au_fclr_cpdown(flags, name) \
+	do { (flags) &= ~AuCpdown_##name; } while (0)
 
 struct au_cpdown_dir_args {
 	struct dentry *parent;
@@ -76,7 +78,7 @@ static int au_cpdown_dir_opq(struct dentry *dentry, aufs_bindex_t bdst,
 	dput(opq_dentry);
 	au_fset_cpdown(a->flags, DIROPQ);
 
- out:
+out:
 	return err;
 }
 
@@ -101,7 +103,7 @@ static int au_cpdown_dir_wh(struct dentry *dentry, struct dentry *h_parent,
 	}
 	dput(h_path.dentry);
 
- out:
+out:
 	return err;
 }
 
@@ -170,7 +172,7 @@ static int au_cpdown_dir(struct dentry *dentry, aufs_bindex_t bdst,
 	goto out; /* success */
 
 	/* revert */
- out_opq:
+out_opq:
 	if (au_ftest_cpdown(args->flags, DIROPQ)) {
 		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 		rerr = au_diropq_remove(dentry, bdst);
@@ -182,7 +184,7 @@ static int au_cpdown_dir(struct dentry *dentry, aufs_bindex_t bdst,
 			goto out;
 		}
 	}
- out_dir:
+out_dir:
 	if (au_ftest_cpdown(args->flags, MADE_DIR)) {
 		rerr = vfsub_sio_rmdir(au_h_iptr(dir, bdst), &h_path);
 		if (unlikely(rerr)) {
@@ -191,11 +193,11 @@ static int au_cpdown_dir(struct dentry *dentry, aufs_bindex_t bdst,
 			err = -EIO;
 		}
 	}
- out_put:
+out_put:
 	au_set_h_dptr(dentry, bdst, NULL);
 	if (au_dbend(dentry) == bdst)
 		au_update_dbend(dentry);
- out:
+out:
 	dput(parent);
 	return err;
 }
@@ -230,8 +232,7 @@ static int au_wbr_nonopq(struct dentry *dentry, aufs_bindex_t bindex)
 	if (unlikely(err))
 		goto out;
 	parent = dget_parent(dentry);
-	err = au_dcsub_pages_rev(&dpages, parent, /*do_include*/0, /*test*/NULL,
-				 /*arg*/NULL);
+	err = au_dcsub_pages_rev_aufs(&dpages, parent, /*do_include*/0);
 	if (unlikely(err))
 		goto out_free;
 
@@ -300,7 +301,7 @@ static int au_wbr_create_tdp(struct dentry *dentry, int isdir __maybe_unused)
 			err = au_wbr_nonopq(dentry, err);
 	}
 
- out:
+out:
 	AuDbg("b%d\n", err);
 	return err;
 }
@@ -391,7 +392,7 @@ static int au_wbr_create_rr(struct dentry *dentry, int isdir)
 	if (err >= 0)
 		err = au_wbr_nonopq(dentry, err);
 
- out:
+out:
 	AuDbg("%d\n", err);
 	return err;
 }
@@ -475,7 +476,7 @@ static int au_wbr_create_mfs(struct dentry *dentry, int isdir __maybe_unused)
 	if (err >= 0)
 		err = au_wbr_nonopq(dentry, err);
 
- out:
+out:
 	AuDbg("b%d\n", err);
 	return err;
 }
@@ -576,9 +577,9 @@ static int au_wbr_create_pmfs(struct dentry *dentry, int isdir)
 	if (err >= 0)
 		err = au_wbr_nonopq(dentry, err);
 
- out_parent:
+out_parent:
 	dput(parent);
- out:
+out:
 	AuDbg("b%d\n", err);
 	return err;
 }

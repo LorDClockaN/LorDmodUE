@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,13 +27,16 @@ static struct inotify_handle *au_hin_handle;
 
 /* ---------------------------------------------------------------------- */
 
-static int au_hin_alloc(struct au_hnotify *hn, struct inode *h_inode)
+static int au_hin_alloc(struct au_hinode *hinode)
 {
 	int err;
 	s32 wd;
+	struct au_hnotify *hn;
+	struct inode *h_inode;
 	struct inotify_watch *watch;
 
 	err = -EEXIST;
+	h_inode = hinode->hi_inode;
 	wd = inotify_find_watch(au_hin_handle, h_inode, &watch);
 	if (wd >= 0) {
 		put_inotify_watch(watch);
@@ -41,6 +44,7 @@ static int au_hin_alloc(struct au_hnotify *hn, struct inode *h_inode)
 	}
 
 	err = 0;
+	hn = hinode->hi_notify;
 	inotify_init_watch(&hn->hn_watch);
 	wd = inotify_add_watch(au_hin_handle, &hn->hn_watch, h_inode,
 			       AuHinMask);
@@ -53,11 +57,13 @@ out:
 	return err;
 }
 
-static void au_hin_free(struct au_hnotify *hn)
+static void au_hin_free(struct au_hinode *hinode)
 {
 	int err;
+	struct au_hnotify *hn;
 
 	err = 0;
+	hn = hinode->hi_notify;
 	if (atomic_read(&hn->hn_watch.count))
 		err = inotify_rm_watch(au_hin_handle, &hn->hn_watch);
 	if (unlikely(err))
@@ -126,7 +132,9 @@ static u32 au_hin_conv_mask(u32 mask)
 	u32 conv;
 
 	conv = 0;
-#define do_conv(flag)	conv |= (mask & IN_ ## flag) ? FS_ ## flag : 0
+#define do_conv(flag)	do {					\
+		conv |= (mask & IN_ ## flag) ? FS_ ## flag : 0; \
+	} while (0)
 	do_conv(ACCESS);
 	do_conv(MODIFY);
 	do_conv(ATTRIB);
@@ -142,7 +150,9 @@ static u32 au_hin_conv_mask(u32 mask)
 	do_conv(UNMOUNT);
 	do_conv(Q_OVERFLOW);
 #undef do_conv
-#define do_conv(flag)	conv |= (mask & IN_ ## flag) ? FS_IN_ ## flag : 0
+#define do_conv(flag)	do {						\
+		conv |= (mask & IN_ ## flag) ? FS_IN_ ## flag : 0;	\
+	} while (0)
 	do_conv(IGNORED);
 	/* do_conv(ISDIR); */
 	/* do_conv(ONESHOT); */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,9 +43,9 @@ struct au_rwsem {
 	smp_mb(); /* atomic set */ \
 } while (0)
 
-#define AuDbgRcntInc(rw)	atomic_inc_return(&(rw)->rcnt)
+#define AuDbgRcntInc(rw)	atomic_inc(&(rw)->rcnt)
 #define AuDbgRcntDec(rw)	WARN_ON(atomic_dec_return(&(rw)->rcnt) < 0)
-#define AuDbgWcntInc(rw)	WARN_ON(atomic_inc_return(&(rw)->wcnt) > 1)
+#define AuDbgWcntInc(rw)	atomic_inc(&(rw)->wcnt)
 #define AuDbgWcntDec(rw)	WARN_ON(atomic_dec_return(&(rw)->wcnt) < 0)
 #else
 #define AuDbgCntInit(rw)	do {} while (0)
@@ -64,6 +64,8 @@ struct au_rwsem {
 					&& atomic_read(&(rw)->wcnt) <= 0)
 #define AuRwDestroy(rw)		AuDebugOn(atomic_read(&(rw)->rcnt) \
 					|| atomic_read(&(rw)->wcnt))
+
+#define au_rw_class(rw, key)	lockdep_set_class(&(rw)->rwsem, key)
 
 static inline void au_rw_init(struct au_rwsem *rw)
 {

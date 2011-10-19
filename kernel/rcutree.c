@@ -532,9 +532,9 @@ static void check_cpu_stall(struct rcu_state *rsp, struct rcu_data *rdp)
 
 	if (rcu_cpu_stall_panicking)
 		return;
-	delta = jiffies - rsp->jiffies_stall;
+	delta = jiffies - ACCESS_ONCE(rsp->jiffies_stall);
 	rnp = rdp->mynode;
-	if ((rnp->qsmask & rdp->grpmask) && delta >= 0) {
+	if ((ACCESS_ONCE(rnp->qsmask) & rdp->grpmask) && delta >= 0) {
 
 		/* We haven't checked in, so go dump stack. */
 		print_cpu_stall(rsp);
@@ -550,6 +550,22 @@ static int rcu_panic(struct notifier_block *this, unsigned long ev, void *ptr)
 {
 	rcu_cpu_stall_panicking = 1;
 	return NOTIFY_DONE;
+}
+
+/**
+ * rcu_cpu_stall_reset - prevent further stall warnings in current grace period
+ *
+ * Set the stall-warning timeout way off into the future, thus preventing
+ * any RCU CPU stall-warning messages from appearing in the current set of
+ * RCU grace periods.
+ *
+ * The caller must disable hard irqs.
+ */
+void rcu_cpu_stall_reset(void)
+{
+	rcu_sched_state.jiffies_stall = jiffies + ULONG_MAX / 2;
+	rcu_bh_state.jiffies_stall = jiffies + ULONG_MAX / 2;
+	rcu_preempt_stall_reset();
 }
 
 static struct notifier_block rcu_panic_block = {
@@ -568,6 +584,10 @@ static void record_gp_stall_check_time(struct rcu_state *rsp)
 }
 
 static void check_cpu_stall(struct rcu_state *rsp, struct rcu_data *rdp)
+{
+}
+
+void rcu_cpu_stall_reset(void)
 {
 }
 

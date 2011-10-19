@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -100,9 +100,11 @@ static int aufs_release_sp(struct inode *inode, struct file *file)
 /* ---------------------------------------------------------------------- */
 
 /* currently, support only FIFO */
-enum {AuSp_FIFO, AuSp_FIFO_R, AuSp_FIFO_W, AuSp_FIFO_RW,
-      /* AuSp_SOCK, AuSp_CHR, AuSp_BLK, */
-      AuSp_Last};
+enum {
+	AuSp_FIFO, AuSp_FIFO_R, AuSp_FIFO_W, AuSp_FIFO_RW,
+	/* AuSp_SOCK, AuSp_CHR, AuSp_BLK, */
+	AuSp_Last
+};
 static int aufs_open_sp(struct inode *inode, struct file *file);
 static struct au_sp_fop {
 	int			done;
@@ -202,7 +204,7 @@ static int au_cpup_sp(struct dentry *dentry)
 		au_unpin(&pin);
 	}
 
- out:
+out:
 	di_downgrade_lock(dentry, AuLock_IR);
 	return err;
 }
@@ -242,10 +244,8 @@ static int au_do_open_sp(struct file *file, int flags)
 	di_read_lock_child(dentry, AuLock_IR);
 	if (!err)
 		au_init_fop_sp(file);
-	else
-		au_finfo_fin(file);
 
- out:
+out:
 	return err;
 }
 

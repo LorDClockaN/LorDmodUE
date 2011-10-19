@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ unsigned int aufs_poll(struct file *file, poll_table *wait)
 	mask = POLLERR /* | POLLIN | POLLOUT */;
 	dentry = file->f_dentry;
 	sb = dentry->d_sb;
-	si_read_lock(sb, AuLock_FLUSH);
+	si_read_lock(sb, AuLock_FLUSH | AuLock_NOPLMW);
 	err = au_reval_and_lock_fdi(file, au_reopen_nondir, /*wlock*/0);
 	if (unlikely(err))
 		goto out;
@@ -49,7 +49,7 @@ unsigned int aufs_poll(struct file *file, poll_table *wait)
 	di_read_unlock(dentry, AuLock_IR);
 	fi_read_unlock(file);
 
- out:
+out:
 	si_read_unlock(sb);
 	AuTraceErr((int)mask);
 	return mask;

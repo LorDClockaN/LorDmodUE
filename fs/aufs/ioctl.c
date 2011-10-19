@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,9 +69,9 @@ static int au_wbr_fd(struct path *path)
 	err = fd;
 	goto out; /* success */
 
- out_fd:
+out_fd:
 	put_unused_fd(fd);
- out:
+out:
 	return err;
 }
 
@@ -82,11 +82,6 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg)
 	long err;
 
 	switch (cmd) {
-	case AUFS_CTL_PLINK_MAINT:
-	case AUFS_CTL_PLINK_CLEAN:
-		err = au_plink_ioctl(file, cmd);
-		break;
-
 	case AUFS_CTL_RDU:
 	case AUFS_CTL_RDU_INO:
 		err = au_rdu_ioctl(file, cmd, arg);
@@ -94,6 +89,10 @@ long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case AUFS_CTL_WBR_FD:
 		err = au_wbr_fd(&file->f_path);
+		break;
+
+	case AUFS_CTL_IBUSY:
+		err = au_ibusy_ioctl(file, arg);
 		break;
 
 	default:
@@ -135,6 +134,10 @@ long aufs_compat_ioctl_dir(struct file *file, unsigned int cmd,
 	case AUFS_CTL_RDU:
 	case AUFS_CTL_RDU_INO:
 		err = au_rdu_compat_ioctl(file, cmd, arg);
+		break;
+
+	case AUFS_CTL_IBUSY:
+		err = au_ibusy_compat_ioctl(file, arg);
 		break;
 
 	default:

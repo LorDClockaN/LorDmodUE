@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,7 +80,7 @@ static int dbgaufs_xi_open(struct file *xf, struct file *file, int do_fcnt)
 		err = 0;
 	}
 
- out:
+out:
 	return err;
 
 }
@@ -151,7 +151,7 @@ static int dbgaufs_xino_open(struct inode *inode, struct file *file)
 		err = -ENOENT;
 	si_read_unlock(sb);
 
- out:
+out:
 	return err;
 }
 
@@ -309,9 +309,9 @@ int dbgaufs_si_init(struct au_sbinfo *sbinfo)
 	if (!err)
 		goto out; /* success */
 
- out_dir:
+out_dir:
 	dbgaufs_si_fin(sbinfo);
- out:
+out:
 	return err;
 }
 

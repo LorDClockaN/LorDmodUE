@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2010 Junjiro R. Okajima
+ * Copyright (C) 2005-2011 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,7 @@
 
 #include "aufs.h"
 
-int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
-		struct inode *h_inode)
+int au_hn_alloc(struct au_hinode *hinode, struct inode *inode)
 {
 	int err;
 	struct au_hnotify *hn;
@@ -32,10 +31,11 @@ int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
 	hn = au_cache_alloc_hnotify();
 	if (hn) {
 		hn->hn_aufs_inode = inode;
-		err = au_hnotify_op.alloc(hn, h_inode);
-		if (!err)
-			hinode->hi_notify = hn;
-		else {
+		hinode->hi_notify = hn;
+		err = au_hnotify_op.alloc(hinode);
+		AuTraceErr(err);
+		if (unlikely(err)) {
+			hinode->hi_notify = NULL;
 			au_cache_free_hnotify(hn);
 			/*
 			 * The upper dir was removed by udba, but the same named
@@ -48,6 +48,7 @@ int au_hn_alloc(struct au_hinode *hinode, struct inode *inode,
 		}
 	}
 
+	AuTraceErr(err);
 	return err;
 }
 
@@ -57,7 +58,7 @@ void au_hn_free(struct au_hinode *hinode)
 
 	hn = hinode->hi_notify;
 	if (hn) {
-		au_hnotify_op.free(hn);
+		au_hnotify_op.free(hinode);
 		au_cache_free_hnotify(hn);
 		hinode->hi_notify = NULL;
 	}
@@ -140,7 +141,7 @@ static int hn_xino(struct inode *inode, struct inode *h_inode)
 
 	/* children inode number will be broken */
 
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }
@@ -170,7 +171,6 @@ static int hn_gen_tree(struct dentry *dentry)
 			if (IS_ROOT(d))
 				continue;
 
-			d_drop(d);
 			au_digen_dec(d);
 			if (d->d_inode)
 				/* todo: reset children xino?
@@ -179,13 +179,15 @@ static int hn_gen_tree(struct dentry *dentry)
 		}
 	}
 
- out_dpages:
+out_dpages:
 	au_dpages_free(&dpages);
 
+#if 0
 	/* discard children */
 	dentry_unhash(dentry);
 	dput(dentry);
- out:
+#endif
+out:
 	return err;
 }
 
@@ -216,15 +218,12 @@ static int hn_gen_by_inode(char *name, unsigned int nlen, struct inode *inode,
 			    && memcmp(dname->name, name, nlen))
 				continue;
 			err = 0;
-			spin_lock(&d->d_lock);
-			__d_drop(d);
 			au_digen_dec(d);
-			spin_unlock(&d->d_lock);
 			break;
 		}
 		spin_unlock(&dcache_lock);
 	} else {
-		au_fset_si(au_sbi(inode->i_sb), FAILED_REFRESH_DIRS);
+		au_fset_si(au_sbi(inode->i_sb), FAILED_REFRESH_DIR);
 		d = d_find_alias(inode);
 		if (!d) {
 			au_iigen_dec(inode);
@@ -237,7 +236,7 @@ static int hn_gen_by_inode(char *name, unsigned int nlen, struct inode *inode,
 		dput(d);
 	}
 
- out:
+out:
 	AuTraceErr(err);
 	return err;
 }
@@ -257,12 +256,11 @@ static int hn_gen_by_name(struct dentry *dentry, const unsigned int isdir)
 
 	err = 0;
 	if (!isdir) {
-		d_drop(dentry);
 		au_digen_dec(dentry);
 		if (inode)
 			au_iigen_dec(inode);
 	} else {
-		au_fset_si(au_sbi(dentry->d_sb), FAILED_REFRESH_DIRS);
+		au_fset_si(au_sbi(dentry->d_sb), FAILED_REFRESH_DIR);
 		if (inode)
 			err = hn_gen_tree(dentry);
 	}
@@ -281,8 +279,10 @@ static int hn_gen_by_name(struct dentry *dentry, const unsigned int isdir)
 #define AuHnJob_TRYXINO0	(1 << 4)
 #define AuHnJob_MNTPNT		(1 << 5)
 #define au_ftest_hnjob(flags, name)	((flags) & AuHnJob_##name)
-#define au_fset_hnjob(flags, name)	{ (flags) |= AuHnJob_##name; }
-#define au_fclr_hnjob(flags, name)	{ (flags) &= ~AuHnJob_##name; }
+#define au_fset_hnjob(flags, name) \
+	do { (flags) |= AuHnJob_##name; } while (0)
+#define au_fclr_hnjob(flags, name) \
+	do { (flags) &= ~AuHnJob_##name; } while (0)
 
 enum {
 	AuHn_CHILD,
@@ -374,12 +374,12 @@ static struct dentry *lookup_wlock_by_name(char *name, unsigned int nlen,
 		dname = &d->d_name;
 		if (dname->len != nlen || memcmp(dname->name, name, nlen))
 			continue;
-		if (!atomic_read(&d->d_count) || !d->d_fsdata) {
-			spin_lock(&d->d_lock);
-			__d_drop(d);
-			spin_unlock(&d->d_lock);
+		if (au_di(d))
+			au_digen_dec(d);
+		else
 			continue;
-		}
+		if (!atomic_read(&d->d_count))
+			continue;
 
 		dentry = dget(d);
 		break;
@@ -416,7 +416,7 @@ static struct inode *lookup_wlock_by_ino(struct super_block *sb,
 
 	ii_write_lock_child(inode);
 
- out:
+out:
 	return inode;
 }
 
@@ -451,8 +451,7 @@ static void au_hn_bh(void *_args)
 	AuDebugOn(!sb);
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!sbinfo);
-	/* big aufs lock */
-	si_noflush_write_lock(sb);
+	si_write_lock(sb, AuLock_NOPLMW);
 
 	ii_read_lock_parent(a->dir);
 	bfound = -1;
@@ -497,7 +496,7 @@ static void au_hn_bh(void *_args)
 	args.h_nlen = a->h_child_nlen;
 	err = hn_job(&args);
 	if (dentry) {
-		if (dentry->d_fsdata)
+		if (au_di(dentry))
 			di_write_unlock(dentry);
 		dput(dentry);
 	}
@@ -518,13 +517,12 @@ static void au_hn_bh(void *_args)
 	err = hn_job(&args);
 	ii_write_unlock(a->dir);
 
- out:
-	au_nwt_done(&sbinfo->si_nowait);
-	si_write_unlock(sb);
-
+out:
 	iput(a->h_child_inode);
 	iput(a->h_dir);
 	iput(a->dir);
+	si_write_unlock(sb);
+	au_nwt_done(&sbinfo->si_nowait);
 	kfree(a);
 }
 
@@ -633,6 +631,38 @@ out:
 	return err;
 }
 
+/* ---------------------------------------------------------------------- */
+
+int au_hnotify_reset_br(unsigned int udba, struct au_branch *br, int perm)
+{
+	int err;
+
+	AuDebugOn(!(udba & AuOptMask_UDBA));
+
+	err = 0;
+	if (au_hnotify_op.reset_br)
+		err = au_hnotify_op.reset_br(udba, br, perm);
+
+	return err;
+}
+
+int au_hnotify_init_br(struct au_branch *br, int perm)
+{
+	int err;
+
+	err = 0;
+	if (au_hnotify_op.init_br)
+		err = au_hnotify_op.init_br(br, perm);
+
+	return err;
+}
+
+void au_hnotify_fin_br(struct au_branch *br)
+{
+	if (au_hnotify_op.fin_br)
+		au_hnotify_op.fin_br(br);
+}
+
 static void au_hn_destroy_cache(void)
 {
 	kmem_cache_destroy(au_cachep[AuCache_HNOTIFY]);
@@ -646,7 +676,9 @@ int __init au_hnotify_init(void)
 	err = -ENOMEM;
 	au_cachep[AuCache_HNOTIFY] = AuCache(au_hnotify);
 	if (au_cachep[AuCache_HNOTIFY]) {
-		err = au_hnotify_op.init();
+		err = 0;
+		if (au_hnotify_op.init)
+			err = au_hnotify_op.init();
 		if (unlikely(err))
 			au_hn_destroy_cache();
 	}
@@ -656,7 +688,8 @@ int __init au_hnotify_init(void)
 
 void au_hnotify_fin(void)
 {
-	au_hnotify_op.fin();
+	if (au_hnotify_op.fin)
+		au_hnotify_op.fin();
 	/* cf. au_cache_fin() */
 	if (au_cachep[AuCache_HNOTIFY])
 		au_hn_destroy_cache();
