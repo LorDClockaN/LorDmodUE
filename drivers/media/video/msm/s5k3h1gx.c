@@ -93,8 +93,8 @@
 #define S5K3H1GX_AF_I2C_ADDR 0x18
 #define S5K3H1GX_TOTAL_STEPS_NEAR_TO_FAR 42 /* 36 */
 #define S5K3H1GX_SW_DAMPING_STEP 10
-#define S5K3H1GX_MAX_FPS 30
-#define S5K3H1GX_MAX_FPS_PARALLEL 30 /* 22 */
+#define S5K3H1GX_MAX_FPS 60
+#define S5K3H1GX_MAX_FPS_PARALLEL 60 /* 22 */
 
 /*=============================================================
  SENSOR REGISTER DEFINES
