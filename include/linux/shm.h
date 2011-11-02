@@ -14,7 +14,11 @@
  * be increased by sysctl
  */
 
+#ifdef CONFIG_KERNELIZER
 #define SHMMAX 0x268435456		 /* max shared seg size (bytes) */
+#else
+#define SHMMAX 0x2000000		 /* max shared seg size (bytes) */
+#endif
 #define SHMMIN 1			 /* min shared seg size (bytes) */
 #define SHMMNI 4096			 /* max num of segs system wide */
 #ifdef __KERNEL__

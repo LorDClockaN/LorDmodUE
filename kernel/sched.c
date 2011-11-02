@@ -709,9 +709,15 @@ enum {
 #define SCHED_FEAT(name, enabled)	\
 	(1UL << __SCHED_FEAT_##name) * enabled |
 
+#ifdef CONFIG_KERNELIZER
 const_debug unsigned int sysctl_sched_features =
 #include "sched_features.h"
 	24189;
+#else
+const_debug unsigned int sysctl_sched_features =
+#include "sched_features.h"
+	0;
+#endif
 
 #undef SCHED_FEAT
 

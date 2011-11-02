@@ -6,6 +6,12 @@ config 2WCR
 	help
 	  Enables 2 Way Call Recording patch to be implemented"
 
+config KERNELIZER
+	bool "Kernelizer"
+	default y
+	help
+	  Enables Kernelizer tweaks
+
 choice
 	prompt "Qualcomm MSM SoC Type"
 	default ARCH_MSM7X00A
