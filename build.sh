@@ -16,6 +16,8 @@ cp drivers/staging/zram/zram.ko ../finished/;
 #cp lib/lzo/lzo_compress.ko ../finished/;
 cp arch/arm/mach-msm/qdsp5v2_1x/qc_pcm_in.ko ../finished/;
 cp drivers/net/kineto_gan.ko ../finished/;
+cp drivers/net/tun.ko ../finished/;
+cp fs/cifs/cifs.ko ../finished/;
 
 echo "COMPILING FINISHED!!!";
 read;
