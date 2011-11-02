@@ -641,7 +641,7 @@ kgsl_ringbuffer_addcmds(struct kgsl_ringbuffer *rb,
 	*  error checking if needed
 	*/
 	total_sizedwords += flags & KGSL_CMD_FLAGS_PMODE ? 4 : 0;
-	total_sizedwords += !(flags & KGSL_CMD_FLAGS_NO_TS_CMP) ? 9 : 0;
+	total_sizedwords += !(flags & KGSL_CMD_FLAGS_NO_TS_CMP) ? 7 : 0;
 
 	ringcmds = kgsl_ringbuffer_allocspace(rb, total_sizedwords);
 
@@ -678,9 +678,6 @@ kgsl_ringbuffer_addcmds(struct kgsl_ringbuffer *rb,
 	GSL_RB_WRITE(ringcmds, rb->timestamp);
 
 	if (!(flags & KGSL_CMD_FLAGS_NO_TS_CMP)) {
-		/*  Add idle packet so avoid RBBM errors */
-		GSL_RB_WRITE(ringcmds, pm4_type3_packet(PM4_WAIT_FOR_IDLE, 1));
-		GSL_RB_WRITE(ringcmds, 0x00000000);
 		/* Conditional execution based on memory values */
 		GSL_RB_WRITE(ringcmds, pm4_type3_packet(PM4_COND_EXEC, 4));
 		GSL_RB_WRITE(ringcmds, (rb->device->memstore.gpuaddr +
