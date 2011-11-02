@@ -269,7 +269,6 @@ kgsl_g12_init(struct kgsl_device *device,
 
 	INIT_LIST_HEAD(&device->ringbuffer.memqueue);
 
-	printk(KERN_INFO "kgsl mmu config 0x%x\n", config->mmu_config);
 	if (config->mmu_config) {
 		device->mmu.config    = config->mmu_config;
 		device->mmu.mpu_base  = config->mpu_base;
