@@ -1,16 +1,33 @@
 if ARCH_MSM
 
+config LORDMOD
+	tristate "LorDmod custom configs"
+	default y
+	help
+	  Custom settings for LorDmod kernel, for easier kernel
+	  customization before compiling
+
 config 2WCR
 	bool "2 Way Call Recording"
-	default y
+	depends on LORDMOD
+	default n
 	help
 	  Enables 2 Way Call Recording patch to be implemented"
 
 config KERNELIZER
 	bool "Kernelizer"
-	default y
+	depends on LORDMOD	
+	default n
 	help
 	  Enables Kernelizer tweaks
+
+config SPI_AIC3254_SELF_POWER_DOWN
+	tristate "TI AIC3254 self powerdown support"
+	depends on LORDMOD	
+	default n
+	help
+	  This option allow the driver to self power down when both
+	  up and down link are off
 
 choice
 	prompt "Qualcomm MSM SoC Type"
