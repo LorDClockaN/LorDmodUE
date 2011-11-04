@@ -82,6 +82,10 @@ DEFINE_PER_CPU(struct rcu_data, rcu_sched_data);
 struct rcu_state rcu_bh_state = RCU_STATE_INITIALIZER(rcu_bh_state);
 DEFINE_PER_CPU(struct rcu_data, rcu_bh_data);
 
+#ifdef CONFIG_SMP
+static void force_qs_rnp(struct rcu_state *rsp, int (*f)(struct rcu_data *));
+#endif
+
 int rcu_scheduler_active __read_mostly;
 EXPORT_SYMBOL_GPL(rcu_scheduler_active);
 
@@ -428,6 +432,16 @@ static int rcu_implicit_dynticks_qs(struct rcu_data *rdp)
 	return rcu_implicit_offline_qs(rdp);
 }
 
+static bool dynticks_idle_likely(void)
+{
+#ifdef CONFIG_HOTPLUG_CPU
+	if (cpu_hotplug_inprogress())
+		return 1;
+#endif
+
+	return 0;
+}
+
 #endif /* #ifdef CONFIG_SMP */
 
 #else /* #ifdef CONFIG_NO_HZ */
@@ -442,6 +456,11 @@ static int dyntick_save_progress_counter(struct rcu_data *rdp)
 static int rcu_implicit_dynticks_qs(struct rcu_data *rdp)
 {
 	return rcu_implicit_offline_qs(rdp);
+}
+
+static bool dynticks_idle_likely(void)
+{
+	return 0;
 }
 
 #endif /* #ifdef CONFIG_SMP */
@@ -799,6 +818,20 @@ rcu_start_gp(struct rcu_state *rsp, unsigned long flags)
 		rnp->completed = rsp->completed;
 		rsp->signaled = RCU_SIGNAL_INIT; /* force_quiescent_state OK. */
 		rcu_start_gp_per_cpu(rsp, rnp, rdp);
+
+#ifdef CONFIG_SMP
+		/* Check for extended quiescent state is a cpu_hotplug
+		 * operation is currently occuring.
+		 */
+		if (dynticks_idle_likely()) {
+			raw_spin_unlock(&rnp->lock);  /* irqs remain disabled */
+
+			/* Record dyntick-idle state */
+			force_qs_rnp(rsp, dyntick_save_progress_counter);
+			raw_spin_lock(&rnp->lock);  /* irqs already disabled */
+			rsp->signaled = RCU_FORCE_QS;
+		}
+#endif
 		raw_spin_unlock_irqrestore(&rnp->lock, flags);
 		return;
 	}
