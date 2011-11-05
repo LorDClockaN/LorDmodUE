@@ -1597,10 +1597,17 @@ static int atmel_ts_probe(struct i2c_client *client,
 		goto err_input_dev_alloc_failed;
 	}
 	ts->input_dev->name = "atmel-touchscreen";
+#ifdef CONFIG_ICS
+//	set_bit(EV_SYN, ts->input_dev->evbit);
+//	set_bit(EV_KEY, ts->input_dev->evbit);
+//	set_bit(BTN_TOUCH, ts->input_dev->keybit);
+//	set_bit(BTN_2, ts->input_dev->keybit);
+#else
 	set_bit(EV_SYN, ts->input_dev->evbit);
 	set_bit(EV_KEY, ts->input_dev->evbit);
 	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 	set_bit(BTN_2, ts->input_dev->keybit);
+#endif
 	set_bit(EV_ABS, ts->input_dev->evbit);
 
 	set_bit(KEY_BACK, ts->input_dev->keybit);

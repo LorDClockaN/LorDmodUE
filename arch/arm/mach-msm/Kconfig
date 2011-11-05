@@ -21,6 +21,13 @@ config KERNELIZER
 	help
 	  Enables Kernelizer tweaks
 
+config ICS
+	bool "ICS touchscreen fix"
+	depends on LORDMOD
+	default n
+	help
+	  compiles touchscreen driver to work in IceCream Sandwich
+
 config SPI_AIC3254_SELF_POWER_DOWN
 	tristate "TI AIC3254 self powerdown support"
 	depends on LORDMOD	
