@@ -506,6 +506,23 @@ static void __init lpj_init(void)
 	}
 }
 
+static struct cpufreq_frequency_table cpufreq_tbl[ARRAY_SIZE(acpu_freq_tbl)];
+
+static void setup_cpufreq_table(void)
+{
+	unsigned i;
+	const struct clkctl_acpu_speed *speed;
+
+	for (i = 0, speed = acpu_freq_tbl; speed->acpu_clk_khz; i++, speed++) {
+		cpufreq_tbl[i].index = i;
+
+		cpufreq_tbl[i].frequency = speed->acpu_clk_khz;
+	}
+	cpufreq_tbl[i].frequency = CPUFREQ_TABLE_END;
+
+	cpufreq_frequency_table_get_attr(cpufreq_tbl, smp_processor_id());
+}
+
 #define RPM_BYPASS_MASK	(1 << 3)
 #define PMIC_MODE_MASK	(1 << 4)
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
@@ -564,3 +581,56 @@ mutex_unlock(&drv_state.lock);
 
 #endif
 
+#ifdef CONFIG_CPU_FREQ_USER_FREQS
+ssize_t acpuclk_get_user_freqs(char *buf, struct cpufreq_policy *policy)
+{
+	int i, len = 0;
+	if (buf)
+	{
+		mutex_lock(&drv_state.lock);
+		for (i = 0; acpu_freq_tbl[i].acpu_clk_khz; i++) 
+		{
+			if (!(acpu_freq_tbl[i].acpu_clk_khz < policy->cpuinfo.min_freq))
+				len += sprintf(buf + len, "%8u: %s\n", acpu_freq_tbl[i].acpu_clk_khz, cpufreq_tbl[i].frequency == CPUFREQ_ENTRY_INVALID ? "Disabled" : "Enabled");
+		}
+		mutex_unlock(&drv_state.lock);
+	}
+	return len;
+}
+
+void acpuclk_set_user_freqs(unsigned acpu_khz, struct cpufreq_policy *policy)
+{
+	int i;
+	int pol_min = policy->min;
+	int pol_max = policy->max;
+	
+	mutex_lock(&drv_state.lock);
+	cpufreq_frequency_table_put_attr(smp_processor_id());
+
+	if (acpu_khz == 0)  // Reset the frequency table to the kernel defaults
+		setup_cpufreq_table();
+	else
+	{
+		for (i = 0; acpu_freq_tbl[i].acpu_clk_khz; i++)
+		{
+			if (acpu_freq_tbl[i].acpu_clk_khz == acpu_khz) {
+				/* If the frequency is marked as CPUFREQ_ENTRY_INVALID, reset the
+				 * frequency to the value in acpu_freq_tbl.
+				 * 
+				 * Else, if the frequency is marked as valid, mark it as
+				 * CPUFREQ_ENTRY_INVALID. */
+				if (cpufreq_tbl[i].frequency == CPUFREQ_ENTRY_INVALID)
+					cpufreq_tbl[i].frequency = acpu_freq_tbl[i].acpu_clk_khz;
+				else
+					cpufreq_tbl[i].frequency = CPUFREQ_ENTRY_INVALID;
+			}
+			/* Mark all frequencies outside of the policy min and policy max
+			 * as CPUFREQ_ENTRY_INVALID. */
+			if (acpu_khz == 1 && (acpu_freq_tbl[i].acpu_clk_khz < pol_min || acpu_freq_tbl[i].acpu_clk_khz > pol_max))
+				cpufreq_tbl[i].frequency = CPUFREQ_ENTRY_INVALID;
+		}
+		cpufreq_frequency_table_get_attr(cpufreq_tbl, smp_processor_id());
+	}
+	mutex_unlock(&drv_state.lock);
+}
+#endif //CONFIG_CPU_FREQ_USER_FREQS

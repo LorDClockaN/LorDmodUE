@@ -80,15 +80,37 @@ static ssize_t show_total_trans(struct cpufreq_policy *policy, char *buf)
 static ssize_t show_time_in_state(struct cpufreq_policy *policy, char *buf)
 {
 	ssize_t len = 0;
-	int i;
+	int i, j;
 	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, policy->cpu);
-	if (!stat)
+	struct cpufreq_frequency_table *table = cpufreq_frequency_get_table(policy->cpu);
+	if (!table || !stat)
 		return 0;
 	cpufreq_stats_update(stat->cpu);
-	for (i = 0; i < stat->state_num; i++) {
-		len += sprintf(buf + len, "%u %llu\n", stat->freq_table[i],
-			(unsigned long long)
-			cputime64_to_clock_t(stat->time_in_state[i]));
+	
+	/* Find the offset if any between the cpufreq frequency table and the
+	 * cpustat frequency table.  If the cpufreq frequency table has entries
+	 * in the begininning of the table marked as CPUFREQ_ENTRY_INVALID, and
+	 * the first record of the cpustats frequency table match later, then the
+	 * frequencies were marked as invalid prior to cpufreq's table being built.
+	 * 
+	 * If the tables match up a few records down, this means that the frequencies
+	 * have been marked invalid AFTER cpufreq has created it's 
+	 * frequency table, i.e., someone disabled frequencies */
+	for (j = 0; table[j].frequency; j++) {
+		if (table[j].frequency == stat->freq_table[0])
+			break;
+		if (table[j].frequency == stat->freq_table[j]) {
+			j = 0;
+			break;
+		}
+	}
+	
+	/* Only return those records that are not marked as invalid in the cpufreq
+	 * frequency table. */
+	for (i = 0; i < stat->state_num; i++, j++) {
+		if (table[j].frequency != CPUFREQ_ENTRY_INVALID)
+			len += sprintf(buf + len, "%u %llu\n", stat->freq_table[i],
+				(unsigned long long)cputime64_to_clock_t(stat->time_in_state[i]));
 	}
 	return len;
 }

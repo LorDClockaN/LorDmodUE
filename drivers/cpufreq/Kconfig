@@ -387,6 +387,13 @@ config CPU_FREQ_VDD_LEVELS
 	help
 	  CPU Vdd levels sysfs interface
 
+config CPU_FREQ_USER_FREQS
+	bool "CPUFREQ User Enable/Disable Frequencies via sysfs interface"
+	depends on CPU_FREQ
+	default n
+	help
+	  CPU Vdd levels sysfs interface
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
