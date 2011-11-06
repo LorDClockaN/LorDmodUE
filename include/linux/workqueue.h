@@ -288,7 +288,7 @@ __alloc_workqueue_key(const char *name, unsigned int flags, int max_active,
 		      struct lock_class_key *key, const char *lock_name);
 
 #ifdef CONFIG_LOCKDEP
-#define alloc_workqueue(name, flags, max_active)		\
+#define alloc_workqueue(name, flags, max_active)	\
 ({								\
 	static struct lock_class_key __key;			\
 	const char *__lock_name;				\
@@ -313,8 +313,9 @@ __alloc_workqueue_key(const char *name, unsigned int flags, int max_active,
 #define create_singlethread_workqueue(name)			\
 	alloc_workqueue((name), WQ_UNBOUND | WQ_RESCUER, 1)
 
-extern void destroy_workqueue(struct workqueue_struct *wq);
 
+extern void destroy_workqueue(struct workqueue_struct *wq);
+extern int is_workqueue_empty(struct workqueue_struct *wq);
 extern int queue_work(struct workqueue_struct *wq, struct work_struct *work);
 extern int queue_work_on(int cpu, struct workqueue_struct *wq,
 			struct work_struct *work);
@@ -339,6 +340,7 @@ int execute_in_process_context(work_func_t fn, struct execute_work *);
 
 extern int flush_work(struct work_struct *work);
 extern int cancel_work_sync(struct work_struct *work);
+extern int print_workqueue(void);
 
 extern void workqueue_set_max_active(struct workqueue_struct *wq,
 				     int max_active);
