@@ -1515,7 +1515,6 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	struct rr_packet *pkt;
 	struct rpc_request_hdr *rq;
 	struct msm_rpc_reply *reply;
-	DEFINE_WAIT(__wait);
 	unsigned long flags;
 	int rc;
 
