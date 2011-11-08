@@ -146,6 +146,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept,
 		  void *data, int len);
 int msm_rpc_read(struct msm_rpc_endpoint *ept,
 		 void **data, unsigned len, long timeout);
+void msm_rpc_read_wakeup(struct msm_rpc_endpoint *ept);
 void msm_rpc_setup_req(struct rpc_request_hdr *hdr,
 		       uint32_t prog, uint32_t vers, uint32_t proc);
 int msm_rpc_register_server(struct msm_rpc_endpoint *ept,

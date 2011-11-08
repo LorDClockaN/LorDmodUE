@@ -952,6 +952,12 @@ struct msm_rpc_endpoint *msm_rpc_open(void)
 	return ept;
 }
 
+void msm_rpc_read_wakeup(struct msm_rpc_endpoint *ept)
+{
+       ept->forced_wakeup = 1;
+       wake_up(&ept->wait_q);
+}
+
 int msm_rpc_close(struct msm_rpc_endpoint *ept)
 {
 	return msm_rpcrouter_destroy_local_endpoint(ept);
@@ -1529,12 +1535,15 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 
 	if (ept->flags & MSM_RPC_UNINTERRUPTIBLE) {
 		if (timeout < 0) {
-			wait_event(ept->wait_q, ept_packet_available(ept));
+                       wait_event(ept->wait_q, (ept_packet_available(ept) ||
+                                                  ept->forced_wakeup));
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
 		} else {
 			rc = wait_event_timeout(
-				ept->wait_q, ept_packet_available(ept),
+                               ept->wait_q,
+                               (ept_packet_available(ept) ||
+                                ept->forced_wakeup),
 				timeout);
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
@@ -1544,14 +1553,17 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	} else {
 		if (timeout < 0) {
 			rc = wait_event_interruptible(
-				ept->wait_q, ept_packet_available(ept));
+                               ept->wait_q, (ept_packet_available(ept) ||
+                                             ept->forced_wakeup));
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
 			if (rc < 0)
 				return rc;
 		} else {
 			rc = wait_event_interruptible_timeout(
-				ept->wait_q, ept_packet_available(ept),
+                               ept->wait_q,
+                               (ept_packet_available(ept) ||
+                                ept->forced_wakeup),
 				timeout);
 			if (!msm_rpc_clear_netreset(ept))
 				return -ENETRESET;
@@ -1559,6 +1571,11 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 				return -ETIMEDOUT;
 		}
 	}
+
+       if (ept->forced_wakeup) {
+               ept->forced_wakeup = 0;
+               return 0;
+       }
 
 	spin_lock_irqsave(&ept->read_q_lock, flags);
 	if (list_empty(&ept->read_q)) {

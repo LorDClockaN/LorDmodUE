@@ -178,6 +178,7 @@ struct msm_rpc_endpoint {
 	struct wake_lock read_q_wake_lock;
 	wait_queue_head_t wait_q;
 	unsigned flags;
+       uint32_t forced_wakeup;
 #if defined(CONFIG_ARCH_MSM7X30)
 	/* restart handling */
 	int restart_state;
