@@ -75,6 +75,11 @@ enum vcd_command {
 	VCD_CMD_CLIENT_CLOSE
 };
 
+enum vcd_core_type {
+	VCD_CORE_1080P,
+	VCD_CORE_720P,
+};
+
 struct vcd_cmd_q_element {
 	enum vcd_command pending_cmd;
 };

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,8 +32,10 @@
 #include <linux/android_pmem.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
 #include <mach/internal_power_rail.h>
 #include <mach/clk.h>
+#include <linux/pm_runtime.h>
 
 #include "vcd_api.h"
 #include "vidc_init_internal.h"
@@ -66,11 +68,33 @@ struct workqueue_struct *vidc_timer_wq;
 static irqreturn_t vidc_isr(int irq, void *dev);
 static spinlock_t vidc_spin_lock;
 
+u32 vidc_msg_timing, vidc_msg_pmem;
+
+#ifdef VIDC_ENABLE_DBGFS
+struct dentry *vidc_debugfs_root;
+
+struct dentry *vidc_get_debugfs_root(void)
+{
+	if (vidc_debugfs_root == NULL)
+		vidc_debugfs_root = debugfs_create_dir("vidc", NULL);
+	return vidc_debugfs_root;
+}
+
+void vidc_debugfs_file_create(struct dentry *root, const char *name,
+				u32 *var)
+{
+	struct dentry *vidc_debugfs_file =
+	    debugfs_create_u32(name, S_IRUGO | S_IWUSR, root, var);
+	if (!vidc_debugfs_file)
+		ERR("%s(): Error creating/opening file %s\n", __func__, name);
+}
+#endif
+
 static void vidc_timer_fn(unsigned long data)
 {
 	unsigned long flag;
 	struct vidc_timer *hw_timer = NULL;
-	DBG("%s() Timer expired\n", __func__);
+	ERR("%s() Timer expired\n", __func__);
 	spin_lock_irqsave(&vidc_spin_lock, flag);
 	hw_timer = (struct vidc_timer *)data;
 	list_add_tail(&hw_timer->list, &vidc_device_p->vidc_timer_queue);
@@ -85,7 +109,7 @@ static void vidc_timer_handler(struct work_struct *work)
 	u32 islist_empty = 0;
 	struct vidc_timer *hw_timer = NULL;
 
-	DBG("%s() Timer expired\n", __func__);
+	ERR("%s() Timer expired\n", __func__);
 	do {
 		spin_lock_irqsave(&vidc_spin_lock, flag);
 		islist_empty = list_empty(&vidc_device_p->vidc_timer_queue);
@@ -150,6 +174,8 @@ static int __devinit vidc_720p_probe(struct platform_device *pdev)
 		ERR("%s: create workque failed\n", __func__);
 		return -ENOMEM;
 	}
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
 	return 0;
 }
 
@@ -159,15 +185,34 @@ static int __devexit vidc_720p_remove(struct platform_device *pdev)
 		ERR("Invalid plaform device ID = %d\n", pdev->id);
 		return -EINVAL;
 	}
+	pm_runtime_disable(&pdev->dev);
+
 	return 0;
 }
 
+static int vidc_runtime_suspend(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: suspending...\n");
+	return 0;
+}
+
+static int vidc_runtime_resume(struct device *dev)
+{
+	dev_dbg(dev, "pm_runtime: resuming...\n");
+	return 0;
+}
+
+static const struct dev_pm_ops vidc_dev_pm_ops = {
+	.runtime_suspend = vidc_runtime_suspend,
+	.runtime_resume = vidc_runtime_resume,
+};
 
 static struct platform_driver msm_vidc_720p_platform_driver = {
 	.probe = vidc_720p_probe,
 	.remove = vidc_720p_remove,
 	.driver = {
-				.name = "msm_vidc",
+		.name = "msm_vidc",
+		.pm   = &vidc_dev_pm_ops,
 	},
 };
 
@@ -188,6 +233,9 @@ static int __init vidc_init(void)
 {
 	int rc = 0;
 	struct device *class_devp;
+#ifdef VIDC_ENABLE_DBGFS
+	struct dentry *root = NULL;
+#endif
 
 	vidc_device_p = kzalloc(sizeof(struct vidc_dev), GFP_KERNEL);
 	if (!vidc_device_p) {
@@ -244,25 +292,32 @@ static int __init vidc_init(void)
 		ERR("%s() :request_irq failed\n", __func__);
 		goto error_vidc_platfom_register;
 	}
-
+	res_trk_init(vidc_device_p->device, vidc_device_p->irq);
 	vidc_timer_wq = create_singlethread_workqueue("vidc_timer_wq");
 	if (!vidc_timer_wq) {
 		ERR("%s: create workque failed\n", __func__);
 		rc = -ENOMEM;
 		goto error_vidc_platfom_register;
 	}
-
 	DBG("Disabling IRQ in %s()\n", __func__);
 	disable_irq_nosync(vidc_device_p->irq);
 	INIT_WORK(&vidc_device_p->vidc_timer_worker,
 			  vidc_timer_handler);
 	spin_lock_init(&vidc_spin_lock);
 	INIT_LIST_HEAD(&vidc_device_p->vidc_timer_queue);
-	res_trk_init(vidc_device_p->device, vidc_device_p->irq);
+
 	vidc_device_p->ref_count = 0;
 	vidc_device_p->firmware_refcount = 0;
 	vidc_device_p->get_firmware = 0;
-
+#ifdef VIDC_ENABLE_DBGFS
+	root = vidc_get_debugfs_root();
+	if (root) {
+		vidc_debugfs_file_create(root, "vidc_msg_timing",
+				(u32 *) &vidc_msg_timing);
+		vidc_debugfs_file_create(root, "vidc_msg_pmem",
+				(u32 *) &vidc_msg_pmem);
+	}
+#endif
 	return 0;
 
 error_vidc_platfom_register:

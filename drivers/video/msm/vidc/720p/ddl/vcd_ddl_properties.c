@@ -843,19 +843,19 @@ static u32 ddl_get_dec_property
 					!decoder->progressive_only,
 					decoder->codec.codec);
 					if (decoder->buf_format.buffer_format
-                                                == VCD_BUFFER_FORMAT_TILE_4x2) {
-                                                fz_size =
-                                                &decoder->client_frame_size;
-                                                fz_size->stride =
-                                                DDL_TILE_ALIGN(fz_size->width,
-                                                        DDL_TILE_ALIGN_WIDTH);
-                                                fz_size->scan_lines =
-                                                DDL_TILE_ALIGN(fz_size->height,
-                                                        DDL_TILE_ALIGN_HEIGHT);
-                                        }
+						== VCD_BUFFER_FORMAT_TILE_4x2) {
+						fz_size =
+						&decoder->client_frame_size;
+						fz_size->stride =
+						DDL_TILE_ALIGN(fz_size->width,
+							DDL_TILE_ALIGN_WIDTH);
+						fz_size->scan_lines =
+						DDL_TILE_ALIGN(fz_size->height,
+							DDL_TILE_ALIGN_HEIGHT);
+					}
 					*(struct vcd_property_frame_size *)
-					    	property_value =
-					    	decoder->client_frame_size;
+						property_value =
+						decoder->client_frame_size;
 					vcd_status = VCD_S_SUCCESS;
 			}
 			break;
@@ -1729,7 +1729,7 @@ void ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,
 	input_buf_req->min_count = 1;
 	input_buf_req->actual_count = input_buf_req->min_count + 3;
 	input_buf_req->max_count = DDL_MAX_BUFFER_COUNT;
-	input_buf_req->sz = (1280*720*3*3) >> 3;
+	input_buf_req->sz = (1280*720*3) >> 2;
 	input_buf_req->align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
 
 	decoder->min_input_buf_req = *input_buf_req;

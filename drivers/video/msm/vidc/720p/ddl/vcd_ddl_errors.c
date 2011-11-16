@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -358,6 +358,10 @@ static u32 ddl_handle_core_recoverable_errors(struct ddl_context \
 	case INVALID_MMCO:
 	case INVALID_PIC_REORDERING:
 	case INVALID_POC_TYPE:
+		{
+			vcd_status = VCD_ERR_BITSTREAM_ERR;
+			break;
+		}
 	case ACTIVE_SPS_NOT_PRESENT:
 	case ACTIVE_PPS_NOT_PRESENT:
 		{
@@ -365,9 +369,9 @@ static u32 ddl_handle_core_recoverable_errors(struct ddl_context \
 			break;
 		}
 	case PROFILE_UNKOWN:
-                if (ddl->decoding)
-                        vcd_status = VCD_ERR_BITSTREAM_ERR;
-                break;
+		if (ddl->decoding)
+			vcd_status = VCD_ERR_BITSTREAM_ERR;
+		break;
 	}
 
 	if (!vcd_status && vcd_event == VCD_EVT_RESP_INPUT_DONE)
@@ -558,16 +562,16 @@ u32 ddl_handle_seqhdr_fail_error(struct ddl_context *ddl_context)
 		case PROFILE_UNKOWN:
 			ERR("SEQ-HDR-FAILED!!!");
 			if ((ddl_context->cmd_err_status ==
-                                 RESOLUTION_NOT_SUPPORTED) &&
-                                (decoder->codec.codec == VCD_CODEC_H264 ||
-                                decoder->codec.codec == VCD_CODEC_H263 ||
-                                decoder->codec.codec == VCD_CODEC_MPEG4 ||
-                                decoder->codec.codec == VCD_CODEC_VC1_RCV ||
-                                decoder->codec.codec == VCD_CODEC_VC1)) {
-                                ddl_client_fatal_cb(ddl_context);
-                                status = true;
-                                break;
-                        }
+				 RESOLUTION_NOT_SUPPORTED) &&
+				(decoder->codec.codec == VCD_CODEC_H264 ||
+				decoder->codec.codec == VCD_CODEC_H263 ||
+				decoder->codec.codec == VCD_CODEC_MPEG4 ||
+				decoder->codec.codec == VCD_CODEC_VC1_RCV ||
+				decoder->codec.codec == VCD_CODEC_VC1)) {
+				ddl_client_fatal_cb(ddl_context);
+				status = true;
+				break;
+			}
 			if (decoder->header_in_start) {
 				decoder->header_in_start = false;
 				ddl_context->ddl_callback(VCD_EVT_RESP_START,

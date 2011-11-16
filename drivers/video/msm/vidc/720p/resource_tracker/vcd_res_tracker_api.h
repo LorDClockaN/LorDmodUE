@@ -41,5 +41,6 @@ u32 res_trk_set_perf_level(u32 req_perf_lvl, u32 *pn_set_perf_lvl,
 	struct vcd_dev_ctxt *dev_ctxt);
 u32 res_trk_get_curr_perf_level(u32 *pn_perf_lvl);
 u32 res_trk_download_firmware(void);
+u32 res_trk_get_core_type(void);
 
 #endif

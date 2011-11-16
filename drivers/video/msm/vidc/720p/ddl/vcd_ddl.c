@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -392,10 +392,6 @@ u32 ddl_decode_frame(u32 *ddl_handle,
 	    (struct ddl_client_context *)ddl_handle;
 	struct ddl_context *ddl_context = ddl_get_context();
 
-#ifdef CORE_TIMING_INFO
-	ddl_get_core_start_time(0);
-#endif
-
 	if (!DDL_IS_INITIALIZED(ddl_context)) {
 		VIDC_LOGERR_STRING("ddl_dec_frame:Not_inited");
 		return VCD_ERR_ILLEGAL_OP;
@@ -461,9 +457,8 @@ u32 ddl_encode_frame(u32 *ddl_handle,
 	    (struct ddl_client_context *)ddl_handle;
 	struct ddl_context *ddl_context = ddl_get_context();
 
-#ifdef CORE_TIMING_INFO
-	ddl_get_core_start_time(1);
-#endif
+	if (vidc_msg_timing)
+		ddl_set_core_start_time(__func__, ENC_OP_TIME);
 
 	if (!DDL_IS_INITIALIZED(ddl_context)) {
 		VIDC_LOGERR_STRING("ddl_enc_frame:Not_inited");
@@ -530,9 +525,10 @@ u32 ddl_decode_end(u32 *ddl_handle, void *client_data)
 
 	ddl_context = ddl_get_context();
 
-#ifdef CORE_TIMING_INFO
-	ddl_reset_time_variables(0);
-#endif
+	if (vidc_msg_timing) {
+		ddl_reset_core_time_variables(DEC_OP_TIME);
+		ddl_reset_core_time_variables(DEC_IP_TIME);
+	}
 
 	if (!DDL_IS_INITIALIZED(ddl_context)) {
 		VIDC_LOGERR_STRING("ddl_dec_end:Not_inited");
@@ -571,9 +567,8 @@ u32 ddl_encode_end(u32 *ddl_handle, void *client_data)
 
 	ddl_context = ddl_get_context();
 
-#ifdef CORE_TIMING_INFO
-	ddl_reset_time_variables(1);
-#endif
+	if (vidc_msg_timing)
+		ddl_reset_core_time_variables(ENC_OP_TIME);
 
 	if (!DDL_IS_INITIALIZED(ddl_context)) {
 		VIDC_LOGERR_STRING("ddl_enc_end:Not_inited");

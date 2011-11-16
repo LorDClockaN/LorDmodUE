@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,8 +28,9 @@ static void ddl_input_failed_cb(struct ddl_client_context *ddl,
 static u32 ddl_handle_core_recoverable_errors(
 	struct ddl_client_context *ddl);
 static u32 ddl_handle_core_warnings(u32 error_code);
-static void ddl_handle_npf_decoding_error(
+static void ddl_release_prev_field(
 	struct ddl_client_context *ddl);
+static u32 ddl_handle_dec_seq_hdr_fail_error(struct ddl_client_context *ddl);
 static void print_core_errors(u32 error_code);
 
 void ddl_hw_fatal_cb(struct ddl_client_context *ddl)
@@ -66,7 +67,10 @@ static u32 ddl_handle_hw_fatal_errors(struct ddl_client_context *ddl)
 	case VIDC_1080P_ERROR_OPEN_CH_ERROR_FRAME_START:
 	case VIDC_1080P_ERROR_SEQ_START_ERROR_FRAME_START:
 	case VIDC_1080P_ERROR_INIT_BUFFERS_ERROR_FRAME_START:
-	case VIDC_1080P_ERROR_CODEC_LIMIT_EXCEEDED:
+	case VIDC_1080P_ERROR_RESOLUTION_CHANGED:
+	case VIDC_1080P_ERROR_INVALID_COMMAND_LAST_FRAME:
+	case VIDC_1080P_ERROR_INVALID_COMMAND:
+	case VIDC_1080P_ERROR_INVALID_CODEC_TYPE:
 	case VIDC_1080P_ERROR_MEM_ALLOCATION_FAILED:
 	case VIDC_1080P_ERROR_INSUFFICIENT_CONTEXT_SIZE:
 	case VIDC_1080P_ERROR_DIVIDE_BY_ZERO:
@@ -110,10 +114,12 @@ static u32 ddl_handle_client_fatal_errors(
 	switch (ddl_context->cmd_err_status) {
 	case VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE:
 	case VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED:
+	case VIDC_1080P_ERROR_VOS_END_CODE_RECEIVED:
 	case VIDC_1080P_ERROR_FRAME_RATE_NOT_SUPPORTED:
 	case VIDC_1080P_ERROR_INVALID_QP_VALUE:
 	case VIDC_1080P_ERROR_INVALID_RC_REACTION_COEFFICIENT:
 	case VIDC_1080P_ERROR_INVALID_CPB_SIZE_AT_GIVEN_LEVEL:
+	case VIDC_1080P_ERROR_B_FRAME_NOT_SUPPORTED:
 	case VIDC_1080P_ERROR_ALLOC_DPB_SIZE_NOT_SUFFICIENT:
 	case VIDC_1080P_ERROR_NUM_DPB_OUT_OF_RANGE:
 	case VIDC_1080P_ERROR_NULL_METADATA_INPUT_POINTER:
@@ -127,7 +133,8 @@ static u32 ddl_handle_client_fatal_errors(
 	break;
 	}
 	if (!status)
-		DDL_MSG_ERROR("VIDC_UNKNOWN_OP_FAILED");
+		DDL_MSG_ERROR("VIDC_UNKNOWN_OP_FAILED %d",
+				ddl_context->cmd_err_status);
 	ddl_client_fatal_cb(ddl);
 	return true;
 }
@@ -155,6 +162,8 @@ static void ddl_input_failed_cb(struct ddl_client_context *ddl,
 			ddl_get_state_string(ddl->client_state));
 		ddl->client_state = DDL_CLIENT_WAIT_FOR_FRAME;
 	}
+	if (vcd_status == VCD_ERR_IFRAME_EXPECTED)
+		vcd_status = VCD_S_SUCCESS;
 	ddl_context->ddl_callback(vcd_event, vcd_status, &ddl->input_frame,
 		payload_size, (u32 *)ddl, ddl->client_data);
 }
@@ -167,145 +176,120 @@ static u32 ddl_handle_core_recoverable_errors(
 	u32 vcd_event = VCD_EVT_RESP_INPUT_DONE;
 	u32 eos = false, status = false;
 
-	if ((ddl->cmd_state == DDL_CMD_DECODE_FRAME) ||
-		(ddl->cmd_state == DDL_CMD_ENCODE_FRAME) ||
-		(ddl->cmd_state == DDL_CMD_HEADER_PARSE)) {
-		if (ddl_context->cmd_err_status ==
-			VIDC_1080P_ERROR_NON_PAIRED_FIELD_NOT_SUPPORTED) {
-			ddl_handle_npf_decoding_error(ddl);
-			status = true;
-		} else {
-			switch (ddl_context->cmd_err_status) {
-			case VIDC_1080P_ERROR_HEADER_NOT_FOUND:
-				if (ddl->client_state !=
-					DDL_CLIENT_WAIT_FOR_INITCODECDONE){
-					DDL_MSG_ERROR("VIDC_CRITICAL_HEADER");
-					DDL_MSG_ERROR("Unrecoverable error");
-				} else {
-					DDL_MSG_ERROR("VIDC_HDR_PARSE_FAIL");
-					vcd_event = VCD_EVT_RESP_START;
-					vcd_status = VCD_ERR_NO_SEQ_HDR;
-					ddl->codec_data.decoder.\
-						header_in_start = false;
-				}
-			break;
-			case VIDC_1080P_ERROR_SYNC_POINT_NOT_RECEIVED:
-				vcd_status = VCD_ERR_IFRAME_EXPECTED;
-			break;
-			case VIDC_1080P_ERROR_NO_BUFFER_RELEASED_FROM_HOST:
-			{
-				u32 pending_display = 0, release_mask;
+	if (ddl->decoding) {
+		if (ddl_handle_dec_seq_hdr_fail_error(ddl))
+			return true;
+	}
 
-				release_mask =
-					ddl->codec_data.decoder.\
-					dpb_mask.hw_mask;
-				while (release_mask > 0) {
-					if (release_mask & 0x1)
-						pending_display++;
-					release_mask >>= 1;
-				}
-				if (pending_display >= ddl->codec_data.\
-					decoder.min_dpb_num) {
-					DDL_MSG_ERROR("VIDC_FW_ISSUE_REQ_BUF");
-					ddl_client_fatal_cb(ddl);
-					status = true;
-				} else {
-					vcd_event = VCD_EVT_RESP_OUTPUT_REQ;
-					DDL_MSG_LOW("VIDC_OUTPUT_BUF_REQ!!");
-				}
+	if ((ddl->cmd_state != DDL_CMD_DECODE_FRAME) &&
+		(ddl->cmd_state != DDL_CMD_ENCODE_FRAME))
+		return false;
+
+	if (ddl->decoding &&
+		(ddl->codec_data.decoder.field_needed_for_prev_ip == 1)) {
+		ddl->codec_data.decoder.field_needed_for_prev_ip = 0;
+		ddl_release_prev_field(ddl);
+		if (ddl_context->cmd_err_status ==
+		 VIDC_1080P_ERROR_NON_PAIRED_FIELD_NOT_SUPPORTED) {
+			ddl_vidc_decode_frame_run(ddl);
+			return true;
+		}
+	}
+
+	switch (ddl_context->cmd_err_status) {
+	case VIDC_1080P_ERROR_SYNC_POINT_NOT_RECEIVED:
+		vcd_status = VCD_ERR_IFRAME_EXPECTED;
+		break;
+	case VIDC_1080P_ERROR_NO_BUFFER_RELEASED_FROM_HOST:
+		{
+			u32 pending_display = 0, release_mask;
+
+			release_mask =
+				ddl->codec_data.decoder.\
+				dpb_mask.hw_mask;
+			while (release_mask > 0) {
+				if (release_mask & 0x1)
+					pending_display++;
+				release_mask >>= 1;
 			}
-			break;
-			case VIDC_1080P_ERROR_BIT_STREAM_BUF_EXHAUST:
-			case VIDC_1080P_ERROR_MB_HEADER_NOT_DONE:
-			case VIDC_1080P_ERROR_MB_COEFF_NOT_DONE:
-			case VIDC_1080P_ERROR_CODEC_SLICE_NOT_DONE:
-			case VIDC_1080P_ERROR_VIDC_CORE_TIME_OUT:
-			case VIDC_1080P_ERROR_VC1_BITPLANE_DECODE_ERR:
-			case VIDC_1080P_ERROR_RESOLUTION_MISMATCH:
-			case VIDC_1080P_ERROR_NV_QUANT_ERR:
-			case VIDC_1080P_ERROR_SYNC_MARKER_ERR:
-			case VIDC_1080P_ERROR_FEATURE_NOT_SUPPORTED:
-			case VIDC_1080P_ERROR_MEM_CORRUPTION:
-			case VIDC_1080P_ERROR_INVALID_REFERENCE_FRAME:
-			case VIDC_1080P_ERROR_PICTURE_CODING_TYPE_ERR:
-			case VIDC_1080P_ERROR_MV_RANGE_ERR:
-			case VIDC_1080P_ERROR_PICTURE_STRUCTURE_ERR:
-			case VIDC_1080P_ERROR_SLICE_ADDR_INVALID:
-			case VIDC_1080P_ERROR_NON_FRAME_DATA_RECEIVED:
-			case VIDC_1080P_ERROR_INCOMPLETE_FRAME:
-			case VIDC_1080P_ERROR_NALU_HEADER_ERROR:
-			case VIDC_1080P_ERROR_SPS_PARSE_ERROR:
-			case VIDC_1080P_ERROR_PPS_PARSE_ERROR:
-			case VIDC_1080P_ERROR_SLICE_PARSE_ERROR:
-				vcd_status = VCD_ERR_BITSTREAM_ERR;
-				DDL_MSG_ERROR("VIDC_BIT_STREAM_ERR");
-			break;
-			default:
-			break;
-			}
-			if (((vcd_status) || (vcd_event !=
-				VCD_EVT_RESP_INPUT_DONE)) && !status) {
-				ddl->input_frame.frm_trans_end = true;
-				eos = ((vcd_event ==
-				VCD_EVT_RESP_INPUT_DONE) &&
-				(ddl->input_frame.vcd_frm.flags &
-				VCD_FRAME_FLAG_EOS));
-				if ((ddl->decoding && eos) ||
-					!ddl->decoding)
-					ddl->input_frame.frm_trans_end =
-						false;
-				if ((vcd_event == VCD_EVT_RESP_INPUT_DONE ||
-					vcd_event == VCD_EVT_RESP_START) &&
-					ddl->decoding &&
-					!ddl->codec_data.decoder.\
-					header_in_start &&
-					!ddl->codec_data.decoder.\
-					dec_disp_info.img_size_x &&
-					!ddl->codec_data.decoder.\
-					dec_disp_info.img_size_y) {
-					vcd_status = VCD_S_SUCCESS;
-					ddl->input_frame.vcd_frm.flags |=
-					VCD_FRAME_FLAG_CODECCONFIG;
-					ddl->input_frame.frm_trans_end =
-						!eos;
-					ddl->codec_data.decoder.\
-						dec_disp_info.img_size_x =
-							0xff;
-				}
-				ddl_input_failed_cb(ddl, vcd_event,
-					vcd_status);
-				if (!ddl->decoding) {
-					ddl->output_frame.frm_trans_end =
-						!eos;
-					ddl->output_frame.vcd_frm.\
-						data_len = 0;
-					ddl_context->ddl_callback(
-						VCD_EVT_RESP_OUTPUT_DONE,
-						VCD_ERR_FAIL,
-						&ddl->output_frame,
-						sizeof(struct
-						ddl_frame_data_tag),
-						(u32 *)ddl,
-						ddl->client_data);
-					if (eos) {
-						DDL_MSG_LOW(
-							"VIDC_ENC_EOS_DONE");
-						ddl_context->ddl_callback(
-							VCD_EVT_RESP_EOS_DONE,
-							VCD_S_SUCCESS,
-							NULL, 0, (u32 *)ddl,
-							ddl->client_data);
-					}
-				}
-				if (ddl->decoding && eos)
-					ddl_vidc_decode_eos_run(ddl);
-				else
-					ddl_release_command_channel(
-						ddl_context,
-						ddl->command_channel);
+			if (pending_display >= ddl->codec_data.\
+				decoder.min_dpb_num) {
+				DDL_MSG_ERROR("VIDC_FW_ISSUE_REQ_BUF");
+				ddl_client_fatal_cb(ddl);
 				status = true;
+			} else {
+				vcd_event = VCD_EVT_RESP_OUTPUT_REQ;
+				DDL_MSG_LOW("VIDC_OUTPUT_BUF_REQ!!");
+			}
+			break;
+		}
+	case VIDC_1080P_ERROR_BIT_STREAM_BUF_EXHAUST:
+	case VIDC_1080P_ERROR_DESCRIPTOR_TABLE_ENTRY_INVALID:
+	case VIDC_1080P_ERROR_MB_COEFF_NOT_DONE:
+	case VIDC_1080P_ERROR_CODEC_SLICE_NOT_DONE:
+	case VIDC_1080P_ERROR_VIDC_CORE_TIME_OUT:
+	case VIDC_1080P_ERROR_VC1_BITPLANE_DECODE_ERR:
+	case VIDC_1080P_ERROR_RESOLUTION_MISMATCH:
+	case VIDC_1080P_ERROR_NV_QUANT_ERR:
+	case VIDC_1080P_ERROR_SYNC_MARKER_ERR:
+	case VIDC_1080P_ERROR_FEATURE_NOT_SUPPORTED:
+	case VIDC_1080P_ERROR_MEM_CORRUPTION:
+	case VIDC_1080P_ERROR_INVALID_REFERENCE_FRAME:
+	case VIDC_1080P_ERROR_PICTURE_CODING_TYPE_ERR:
+	case VIDC_1080P_ERROR_MV_RANGE_ERR:
+	case VIDC_1080P_ERROR_PICTURE_STRUCTURE_ERR:
+	case VIDC_1080P_ERROR_SLICE_ADDR_INVALID:
+	case VIDC_1080P_ERROR_NON_FRAME_DATA_RECEIVED:
+	case VIDC_1080P_ERROR_INCOMPLETE_FRAME:
+	case VIDC_1080P_ERROR_NALU_HEADER_ERROR:
+	case VIDC_1080P_ERROR_SPS_PARSE_ERROR:
+	case VIDC_1080P_ERROR_PPS_PARSE_ERROR:
+	case VIDC_1080P_ERROR_HEADER_NOT_FOUND:
+	case VIDC_1080P_ERROR_SLICE_PARSE_ERROR:
+	case VIDC_1080P_ERROR_NON_PAIRED_FIELD_NOT_SUPPORTED:
+		vcd_status = VCD_ERR_BITSTREAM_ERR;
+		DDL_MSG_ERROR("VIDC_BIT_STREAM_ERR");
+		break;
+	case VIDC_1080P_ERROR_B_FRAME_NOT_SUPPORTED:
+	case VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE:
+	case VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED:
+		if (ddl->decoding) {
+			vcd_status = VCD_ERR_BITSTREAM_ERR;
+			DDL_MSG_ERROR("VIDC_BIT_STREAM_ERR");
+		}
+		break;
+	default:
+		break;
+	}
+
+	if (((vcd_status) || (vcd_event != VCD_EVT_RESP_INPUT_DONE)) &&
+		!status) {
+				ddl->input_frame.frm_trans_end = true;
+		eos = ((vcd_event == VCD_EVT_RESP_INPUT_DONE) &&
+			(ddl->input_frame.vcd_frm.flags & VCD_FRAME_FLAG_EOS));
+		if (((ddl->decoding) && (eos)) || !ddl->decoding)
+			ddl->input_frame.frm_trans_end = false;
+		ddl_input_failed_cb(ddl, vcd_event, vcd_status);
+		if (!ddl->decoding) {
+			ddl->output_frame.frm_trans_end = !eos;
+			ddl->output_frame.vcd_frm.data_len = 0;
+			ddl_context->ddl_callback(VCD_EVT_RESP_OUTPUT_DONE,
+				VCD_ERR_FAIL, &ddl->output_frame,
+				sizeof(struct ddl_frame_data_tag), (u32 *)ddl,
+				ddl->client_data);
+			if (eos) {
+				DDL_MSG_LOW("VIDC_ENC_EOS_DONE");
+				ddl_context->ddl_callback(VCD_EVT_RESP_EOS_DONE,
+					VCD_S_SUCCESS, NULL, 0, (u32 *)ddl,
+					ddl->client_data);
 			}
 		}
+		if ((ddl->decoding) && (eos))
+			ddl_vidc_decode_eos_run(ddl);
+		else
+			ddl_release_command_channel(ddl_context,
+				ddl->command_channel);
+			status = true;
 	}
 	return status;
 }
@@ -355,63 +339,43 @@ u32 ddl_handle_core_errors(struct ddl_context *ddl_context)
 {
 	struct ddl_client_context *ddl;
 	u32 channel_inst_id, status = false;
+	u32 disp_status;
 
 	if (!ddl_context->cmd_err_status &&
 		!ddl_context->disp_pic_err_status) {
 		DDL_MSG_ERROR("VIDC_NO_ERROR");
-	} else {
+		return false;
+	}
 		vidc_1080p_get_returned_channel_inst_id(&channel_inst_id);
 		vidc_1080p_clear_returned_channel_inst_id();
 		ddl = ddl_get_current_ddl_client_for_channel_id(ddl_context,
 			ddl_context->response_cmd_ch_id);
-		if (!ddl) {
-			DDL_MSG_ERROR("VIDC_SPURIOUS_INTERRUPT_ERROR");
-			status = true;
-		} else {
-			u32 disp_status;
-
-			if (ddl_context->cmd_err_status)
-				print_core_errors(
-					ddl_context->cmd_err_status);
-			if (ddl_context->disp_pic_err_status)
-				print_core_errors(
-					ddl_context->disp_pic_err_status);
-			status = ddl_handle_core_warnings(
-				ddl_context->cmd_err_status);
-			disp_status = ddl_handle_core_warnings(
-				ddl_context->disp_pic_err_status);
-			if (!status && !disp_status) {
-				DDL_MSG_ERROR("ddl_warning:Unknown");
-				status = ddl_handle_hw_fatal_errors(ddl);
-				if (!status)
-					status =
-					ddl_handle_core_recoverable_errors(
-						ddl);
-				if (!status)
-					status =
-					ddl_handle_client_fatal_errors(ddl);
-			}
-		}
+	if (!ddl) {
+		DDL_MSG_ERROR("VIDC_SPURIOUS_INTERRUPT_ERROR");
+		return true;
+	}
+	if (ddl_context->cmd_err_status)
+		print_core_errors(ddl_context->cmd_err_status);
+	if (ddl_context->disp_pic_err_status)
+		print_core_errors(ddl_context->disp_pic_err_status);
+	status = ddl_handle_core_warnings(ddl_context->cmd_err_status);
+	disp_status = ddl_handle_core_warnings(
+		ddl_context->disp_pic_err_status);
+	if (!status && !disp_status) {
+		DDL_MSG_ERROR("ddl_warning:Unknown");
+		status = ddl_handle_hw_fatal_errors(ddl);
+		if (!status)
+			status = ddl_handle_core_recoverable_errors(ddl);
+		if (!status)
+			status = ddl_handle_client_fatal_errors(ddl);
 	}
 	return status;
 }
 
-static void ddl_handle_npf_decoding_error(struct ddl_client_context *ddl)
+static void ddl_release_prev_field(struct ddl_client_context *ddl)
 {
-	struct vidc_1080p_dec_disp_info *dec_disp_info =
-		&(ddl->codec_data.decoder.dec_disp_info);
-
-	if (!ddl->decoding) {
-		DDL_MSG_ERROR("VIDC_FW_ISSUE_ENC_NPF");
-		ddl_client_fatal_cb(ddl);
-	} else {
-		vidc_sm_get_frame_tags(
-			&ddl->shared_mem[ddl->command_channel],
-			&dec_disp_info->tag_top,
-			&dec_disp_info->tag_bottom);
-		ddl_vidc_decode_dynamic_property(ddl, false);
-		ddl->output_frame.vcd_frm.ip_frm_tag =
-			dec_disp_info->tag_top;
+	ddl->output_frame.vcd_frm.ip_frm_tag =
+		ddl->codec_data.decoder.prev_ip_frm_tag;
 		ddl->output_frame.vcd_frm.physical = NULL;
 		ddl->output_frame.vcd_frm.virtual = NULL;
 		ddl->output_frame.frm_trans_end = false;
@@ -419,8 +383,84 @@ static void ddl_handle_npf_decoding_error(struct ddl_client_context *ddl)
 			VCD_ERR_INTRLCD_FIELD_DROP, &(ddl->output_frame),
 			sizeof(struct ddl_frame_data_tag),
 			(u32 *) ddl, ddl->client_data);
-		ddl_vidc_decode_frame_run(ddl);
+}
+
+static u32 ddl_handle_dec_seq_hdr_fail_error(struct ddl_client_context *ddl)
+{
+	struct ddl_context *ddl_context = ddl->ddl_context;
+	u32 status = false;
+
+	if ((ddl->cmd_state != DDL_CMD_HEADER_PARSE) ||
+		(ddl->client_state != DDL_CLIENT_WAIT_FOR_INITCODECDONE)) {
+		DDL_MSG_ERROR("STATE-CRITICAL-HDDONE");
+		return false;
 	}
+
+	switch (ddl_context->cmd_err_status) {
+	case VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE:
+	case VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED:
+	case VIDC_1080P_ERROR_HEADER_NOT_FOUND:
+	case VIDC_1080P_ERROR_SPS_PARSE_ERROR:
+	case VIDC_1080P_ERROR_PPS_PARSE_ERROR:
+	{
+		struct ddl_decoder_data *decoder = &ddl->codec_data.decoder;
+		if (ddl_context->cmd_err_status ==
+			VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE
+			&& decoder->codec.codec == VCD_CODEC_H264) {
+			DDL_MSG_ERROR("Unsupported Feature for H264");
+			ddl_client_fatal_cb(ddl);
+			return true;
+		}
+		if ((ddl_context->cmd_err_status ==
+			VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED)
+			&& (decoder->codec.codec == VCD_CODEC_H263
+			|| decoder->codec.codec == VCD_CODEC_H264
+			|| decoder->codec.codec == VCD_CODEC_MPEG4
+			|| decoder->codec.codec == VCD_CODEC_VC1
+			|| decoder->codec.codec == VCD_CODEC_VC1_RCV)) {
+			DDL_MSG_ERROR("Unsupported resolution");
+			ddl_client_fatal_cb(ddl);
+			return true;
+		}
+
+		DDL_MSG_ERROR("SEQHDR-FAILED");
+		if (decoder->header_in_start) {
+			decoder->header_in_start = false;
+			ddl_context->ddl_callback(VCD_EVT_RESP_START,
+				VCD_ERR_SEQHDR_PARSE_FAIL, NULL, 0,
+				(u32 *) ddl, ddl->client_data);
+		} else {
+			ddl->input_frame.frm_trans_end = true;
+			if ((ddl->input_frame.vcd_frm.flags &
+				VCD_FRAME_FLAG_EOS)) {
+				ddl->input_frame.frm_trans_end = false;
+			}
+			ddl_vidc_decode_dynamic_property(ddl, false);
+			ddl_context->ddl_callback(
+				VCD_EVT_RESP_INPUT_DONE,
+				VCD_ERR_SEQHDR_PARSE_FAIL, &ddl->input_frame,
+				sizeof(struct ddl_frame_data_tag), (u32 *)ddl,
+				ddl->client_data);
+			if ((ddl->input_frame.vcd_frm.flags &
+				VCD_FRAME_FLAG_EOS)) {
+				DDL_MSG_HIGH("EOS_DONE-fromDDL");
+				ddl_context->ddl_callback(VCD_EVT_RESP_EOS_DONE,
+				VCD_S_SUCCESS, NULL, 0, (u32 *) ddl,
+				ddl->client_data);
+			}
+		}
+		DDL_MSG_LOW("ddl_state_transition: %s ~~> "
+			"DDL_CLIENT_WAIT_FOR_INITCODEC",
+			ddl_get_state_string(ddl->client_state));
+		ddl->client_state = DDL_CLIENT_WAIT_FOR_INITCODEC;
+		ddl_release_command_channel(ddl_context, ddl->command_channel);
+		status = true;
+		break;
+	}
+	default:
+		break;
+	}
+	return status;
 }
 
 void print_core_errors(u32 error_code)
@@ -465,8 +505,17 @@ void print_core_errors(u32 error_code)
 	case VIDC_1080P_ERROR_INIT_BUFFERS_ERROR_FRAME_START:
 		string = "VIDC_1080P_ERROR_INIT_BUFFERS_ERROR_FRAME_START";
 	break;
-	case VIDC_1080P_ERROR_CODEC_LIMIT_EXCEEDED:
-		string = "VIDC_1080P_ERROR_CODEC_LIMIT_EXCEEDED";
+	case VIDC_1080P_ERROR_RESOLUTION_CHANGED:
+		string = "VIDC_1080P_ERROR_RESOLUTION_CHANGED";
+	break;
+	case VIDC_1080P_ERROR_INVALID_COMMAND_LAST_FRAME:
+		string = "VIDC_1080P_ERROR_INVALID_COMMAND_LAST_FRAME";
+	break;
+	case VIDC_1080P_ERROR_INVALID_COMMAND:
+		string = "VIDC_1080P_ERROR_INVALID_COMMAND";
+	break;
+	case VIDC_1080P_ERROR_INVALID_CODEC_TYPE:
+		string = "VIDC_1080P_ERROR_INVALID_CODEC_TYPE";
 	break;
 	case VIDC_1080P_ERROR_MEM_ALLOCATION_FAILED:
 		string = "VIDC_1080P_ERROR_MEM_ALLOCATION_FAILED";
@@ -492,6 +541,12 @@ void print_core_errors(u32 error_code)
 	case VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE:
 		string = "VIDC_1080P_ERROR_UNSUPPORTED_FEATURE_IN_PROFILE";
 	break;
+	case VIDC_1080P_ERROR_HEADER_NOT_FOUND:
+		string = "VIDC_1080P_ERROR_HEADER_NOT_FOUND";
+	break;
+	case VIDC_1080P_ERROR_VOS_END_CODE_RECEIVED:
+		string = "VIDC_1080P_ERROR_VOS_END_CODE_RECEIVED";
+	break;
 	case VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED:
 		string = "VIDC_1080P_ERROR_RESOLUTION_NOT_SUPPORTED";
 	break;
@@ -506,6 +561,9 @@ void print_core_errors(u32 error_code)
 	break;
 	case VIDC_1080P_ERROR_INVALID_CPB_SIZE_AT_GIVEN_LEVEL:
 		string = "VIDC_1080P_ERROR_INVALID_CPB_SIZE_AT_GIVEN_LEVEL";
+	break;
+	case VIDC_1080P_ERROR_B_FRAME_NOT_SUPPORTED:
+		string = "VIDC_1080P_ERROR_B_FRAME_NOT_SUPPORTED";
 	break;
 	case VIDC_1080P_ERROR_ALLOC_DPB_SIZE_NOT_SUFFICIENT:
 		string = "VIDC_1080P_ERROR_ALLOC_DPB_SIZE_NOT_SUFFICIENT";
@@ -528,9 +586,6 @@ void print_core_errors(u32 error_code)
 	case VIDC_1080P_ERROR_NON_PAIRED_FIELD_NOT_SUPPORTED:
 		string = "VIDC_1080P_ERROR_NON_PAIRED_FIELD_NOT_SUPPORTED";
 	break;
-	case VIDC_1080P_ERROR_HEADER_NOT_FOUND:
-		string = "VIDC_1080P_ERROR_HEADER_NOT_FOUND";
-	break;
 	case VIDC_1080P_ERROR_SYNC_POINT_NOT_RECEIVED:
 		string = "VIDC_1080P_ERROR_SYNC_POINT_NOT_RECEIVED";
 	break;
@@ -540,8 +595,8 @@ void print_core_errors(u32 error_code)
 	case VIDC_1080P_ERROR_BIT_STREAM_BUF_EXHAUST:
 		string = "VIDC_1080P_ERROR_BIT_STREAM_BUF_EXHAUST";
 	break;
-	case VIDC_1080P_ERROR_MB_HEADER_NOT_DONE:
-		string = "VIDC_1080P_ERROR_MB_HEADER_NOT_DONE";
+	case VIDC_1080P_ERROR_DESCRIPTOR_TABLE_ENTRY_INVALID:
+		string = "VIDC_1080P_ERROR_DESCRIPTOR_TABLE_ENTRY_INVALID";
 	break;
 	case VIDC_1080P_ERROR_MB_COEFF_NOT_DONE:
 		string = "VIDC_1080P_ERROR_MB_COEFF_NOT_DONE";
@@ -687,6 +742,5 @@ void print_core_errors(u32 error_code)
 	break;
 	}
 	if (string)
-		DDL_MSG_ERROR("Error code = 0x%x : %s", error_code,
-			string);
+		DDL_MSG_ERROR("Error code = 0x%x : %s", error_code, string);
 }

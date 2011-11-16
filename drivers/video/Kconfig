@@ -2222,14 +2222,7 @@ config FB_BROADSHEET
 	  and could also have been called by other names when coupled with
 	  a bridge adapter.
 
-if ARCH_MSM8X60
-	source "drivers/video/msm_8x60/Kconfig"
-endif
-
-if !ARCH_MSM8X60
 source "drivers/video/msm/Kconfig"
-endif
-
 source "drivers/video/omap/Kconfig"
 source "drivers/video/omap2/Kconfig"
 

@@ -47,6 +47,7 @@ struct res_trk_context {
 	unsigned int clock_enabled;
 	unsigned int rail_enabled;
 	unsigned int perf_level;
+	u32 core_type;
 };
 
 #if DEBUG
