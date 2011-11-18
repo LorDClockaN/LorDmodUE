@@ -25,19 +25,9 @@ DEFINE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
 
 DEFINE_MUTEX(cpuidle_lock);
 LIST_HEAD(cpuidle_detected_devices);
+static void (*pm_idle_old)(void);
 
 static int enabled_devices;
-static int off __read_mostly;
-static int initialized __read_mostly;
-
-int cpuidle_disabled(void)
-{
-	return off;
-}
-void disable_cpuidle(void)
-{
-	off = 1;
-}
 
 #if defined(CONFIG_ARCH_HAS_CPU_IDLE_WAIT)
 static void cpuidle_kick_cpus(void)
@@ -56,22 +46,25 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
  * cpuidle_idle_call - the main idle loop
  *
  * NOTE: no locks or semaphores should be used here
- * return non-zero on failure
  */
-int cpuidle_idle_call(void)
+static void cpuidle_idle_call(void)
 {
 	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
 	struct cpuidle_state *target_state;
 	int next_state;
 
-	if (off)
-		return -ENODEV;
-
-	if (!initialized)
-		return -ENODEV;
-
-	if (!dev || !dev->enabled)
-		return -EBUSY;
+	/* check if the device is ready */
+	if (!dev || !dev->enabled) {
+		if (pm_idle_old)
+			pm_idle_old();
+		else
+#if defined(CONFIG_ARCH_HAS_DEFAULT_IDLE)
+			default_idle();
+#else
+			local_irq_enable();
+#endif
+		return;
+	}
 
 #if 0
 	/* shows regressions, re-enable for 2.6.29 */
@@ -96,7 +89,7 @@ int cpuidle_idle_call(void)
 	next_state = cpuidle_curr_governor->select(dev);
 	if (need_resched()) {
 		local_irq_enable();
-		return 0;
+		return;
 	}
 
 	target_state = &dev->states[next_state];
@@ -121,8 +114,6 @@ int cpuidle_idle_call(void)
 	/* give the governor an opportunity to reflect on the outcome */
 	if (cpuidle_curr_governor->reflect)
 		cpuidle_curr_governor->reflect(dev);
-
-	return 0;
 }
 
 /**
@@ -130,10 +121,10 @@ int cpuidle_idle_call(void)
  */
 void cpuidle_install_idle_handler(void)
 {
-	if (enabled_devices) {
+	if (enabled_devices && (pm_idle != cpuidle_idle_call)) {
 		/* Make sure all changes finished before we switch to new idle */
 		smp_wmb();
-		initialized = 1;
+		pm_idle = cpuidle_idle_call;
 	}
 }
 
@@ -142,8 +133,8 @@ void cpuidle_install_idle_handler(void)
  */
 void cpuidle_uninstall_idle_handler(void)
 {
-	if (enabled_devices) {
-		initialized = 0;
+	if (enabled_devices && pm_idle_old && (pm_idle != pm_idle_old)) {
+		pm_idle = pm_idle_old;
 		cpuidle_kick_cpus();
 	}
 }
@@ -158,17 +149,6 @@ void cpuidle_pause_and_lock(void)
 }
 
 EXPORT_SYMBOL_GPL(cpuidle_pause_and_lock);
-
-/**
- * cpuidle_resume_and_unlock - resumes CPUIDLE operation
- */
-void cpuidle_resume_and_unlock(void)
-{
-	cpuidle_install_idle_handler();
-	mutex_unlock(&cpuidle_lock);
-}
-
-EXPORT_SYMBOL_GPL(cpuidle_resume_and_unlock);
 
 #ifdef CONFIG_ARCH_HAS_CPU_RELAX
 static int poll_idle(struct cpuidle_device *dev, struct cpuidle_state *st)
@@ -197,7 +177,7 @@ static void poll_idle_init(struct cpuidle_device *dev)
 
 	cpuidle_set_statedata(state, NULL);
 
-	snprintf(state->name, CPUIDLE_NAME_LEN, "POLL");
+	snprintf(state->name, CPUIDLE_NAME_LEN, "C0");
 	snprintf(state->desc, CPUIDLE_DESC_LEN, "CPUIDLE CORE POLL IDLE");
 	state->exit_latency = 0;
 	state->target_residency = 0;
@@ -208,6 +188,17 @@ static void poll_idle_init(struct cpuidle_device *dev)
 #else
 static void poll_idle_init(struct cpuidle_device *dev) {}
 #endif /* CONFIG_ARCH_HAS_CPU_RELAX */
+
+/**
+ * cpuidle_resume_and_unlock - resumes CPUIDLE operation
+ */
+void cpuidle_resume_and_unlock(void)
+{
+	cpuidle_install_idle_handler();
+	mutex_unlock(&cpuidle_lock);
+}
+
+EXPORT_SYMBOL_GPL(cpuidle_resume_and_unlock);
 
 /**
  * cpuidle_enable_device - enables idle PM for a CPU
@@ -232,8 +223,6 @@ int cpuidle_enable_device(struct cpuidle_device *dev)
 		if (ret)
 			return ret;
 	}
-
-	poll_idle_init(dev);
 
 	poll_idle_init(dev);
 
@@ -440,8 +429,7 @@ static int __init cpuidle_init(void)
 {
 	int ret;
 
-	if (cpuidle_disabled())
-		return -ENODEV;
+	pm_idle_old = pm_idle;
 
 	ret = cpuidle_add_class_sysfs(&cpu_sysdev_class);
 	if (ret)
@@ -452,5 +440,4 @@ static int __init cpuidle_init(void)
 	return 0;
 }
 
-module_param(off, int, 0444);
 core_initcall(cpuidle_init);
