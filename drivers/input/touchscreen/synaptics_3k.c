@@ -280,11 +280,20 @@ static void synaptics_ts_work_func(struct work_struct *work)
 		if (finger_pressed == 0) {
 #ifdef CONFIG_TOUCHSCREEN_COMPATIBLE_REPORT
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
+#ifdef CONFIG_ICS
+			input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
+                        input_report_key(ts->input_dev, BTN_TOUCH, 0);
+//                        input_mt_sync(ts->input_dev);
+#endif
 #else
 			input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
 			input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
 #endif
+#ifdef CONFIG_ICS
+//			if (ts->debug_log_level & 0x2)
+#else
 			if (ts->debug_log_level & 0x2)
+#endif
 				printk(KERN_INFO "Finger leave\n");
 		}
 		if (ts->pre_finger_data[0][0] < 2 || finger_pressed) {
@@ -321,6 +330,10 @@ static void synaptics_ts_work_func(struct work_struct *work)
 						finger_data[loop_i][0]);
 					input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
 						finger_data[loop_i][1]);
+#ifdef CONFIG_ICS
+					input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 255);
+                                        input_report_key(ts->input_dev, BTN_TOUCH, 1);
+#endif
 					input_mt_sync(ts->input_dev);
 #else
 					input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
@@ -341,7 +354,11 @@ static void synaptics_ts_work_func(struct work_struct *work)
 								ts->pre_finger_data[0][0] = 1;
 						}
 					}
+#ifdef CONFIG_ICS
+//					if (ts->debug_log_level & 0x2)
+#else
 					if (ts->debug_log_level & 0x2)
+#endif
 						printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
 							loop_i + 1, finger_data[loop_i][0],
 							finger_data[loop_i][1], finger_data[loop_i][2],
@@ -496,17 +513,17 @@ static int synaptics_ts_probe(
 		goto err_input_dev_alloc_failed;
 	}
 	ts->input_dev->name = "synaptics-rmi-touchscreen";
-#ifdef CONFIG_ICS
+//#ifdef CONFIG_ICS
 //	set_bit(EV_SYN, ts->input_dev->evbit);
 //	set_bit(EV_KEY, ts->input_dev->evbit);
 //	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 //	set_bit(BTN_2, ts->input_dev->keybit);
-#else
+//#else
 	set_bit(EV_SYN, ts->input_dev->evbit);
 	set_bit(EV_KEY, ts->input_dev->evbit);
 	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 	set_bit(BTN_2, ts->input_dev->keybit);
-#endif
+//#endif
 	set_bit(EV_ABS, ts->input_dev->evbit);
 
 	set_bit(KEY_BACK, ts->input_dev->keybit);
@@ -523,6 +540,9 @@ static int synaptics_ts_probe(
 
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_WIDTH_MAJOR, 0, 30, 0, 0);
+#ifdef CONFIG_ICS
+	input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE, 0, 255, 0, 0);
+#endif
 #ifndef CONFIG_TOUCHSCREEN_COMPATIBLE_REPORT
 	input_set_abs_params(ts->input_dev, ABS_MT_AMPLITUDE,
 		0, ((255 << 16) | 15), 0, 0);
