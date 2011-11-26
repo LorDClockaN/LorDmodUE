@@ -579,7 +579,7 @@ endif
 
 # Force warning message as hard error
 ifdef CONFIG_FORCE_WARNING_AS_ERROR
-KBUILD_CFLAGS += -Werror
+#KBUILD_CFLAGS += -Werror
 endif
 
 # arch Makefile may override CC so keep this after arch Makefile is included
