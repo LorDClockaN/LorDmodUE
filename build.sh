@@ -6,7 +6,7 @@
 #TOOLCHAIN_PREFIX=arm-eabi-
 
 
-make -j8 ARCH=arm CROSS_COMPILE=$CCOMPILER EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block';
+make -j16 ARCH=arm CROSS_COMPILE=$CCOMPILER EXTRA_AFLAGS='-mfpu=vfpv3 -ftree-vectorize -floop-interchange -floop-strip-mine -floop-block';
 
 
 
@@ -21,6 +21,6 @@ cp fs/cifs/cifs.ko ../finished/;
 
 echo "COMPILING FINISHED!!!";
 read;
-alias make='make -j8 ARCH=arm CROSS_COMPILE=$CCOMPILER'
+alias make='make -j16 ARCH=arm CROSS_COMPILE=$CCOMPILER'
 make clean
 
