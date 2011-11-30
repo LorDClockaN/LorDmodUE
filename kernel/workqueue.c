@@ -502,6 +502,7 @@ static struct global_cwq unbound_global_cwq;
 static atomic_t unbound_gcwq_nr_running = ATOMIC_INIT(0);	/* always 0 */
 
 static int worker_thread(void *__worker);
+	
 
 static struct global_cwq *get_gcwq(unsigned int cpu)
 {
@@ -1935,7 +1936,7 @@ static int worker_thread(void *__worker)
 {
 	struct worker *worker = __worker;
 	struct global_cwq *gcwq = worker->gcwq;
-
+	set_user_nice(current, -5);
 	/* tell the scheduler that this is a workqueue worker */
 	worker->task->flags |= PF_WQ_WORKER;
 woke_up:
