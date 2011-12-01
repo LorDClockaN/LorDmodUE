@@ -1490,7 +1490,7 @@ if !ICS
 config HTC_VOICE_DUALMIC
 	bool "HTC Dual Mic feature"
 	depends on MSM7KV2_1X_AUDIO
-	default y
+	default n
 	help
 	  Enables Dual Mic features.
 endif

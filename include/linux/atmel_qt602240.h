@@ -244,6 +244,7 @@
 #define CB_IDLEGCAFDEPTH                        2
 #define CB_ACTVGCAFDEPTH                        3
 
+#ifdef CONFIG_ICS
 #define WLC_IDLEACQINT                          0
 #define WLC_ACTVACQINT                          1
 #define WLC_ACTV2IDLETO                         2
@@ -251,6 +252,7 @@
 #define WLC_NOISETHR                            4
 #define WLC_IDLEGCAFDEPTH                       5
 #define WLC_ACTVGCAFDEPTH                       6
+#endif
 
 #define NC_TCHTHR                               0
 #define NC_TCHDI                                1
