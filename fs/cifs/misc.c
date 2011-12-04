@@ -33,7 +33,7 @@
 extern mempool_t *cifs_sm_req_poolp;
 extern mempool_t *cifs_req_poolp;
 
-struct workqueue_struct *system_nrt_wq __read_mostly;
+//struct workqueue_struct *system_nrt_wq __read_mostly;
 
 /* The xid serves as a useful identifier for each incoming vfs request,
    in a similar way to the mid which is useful to track each sent smb,
