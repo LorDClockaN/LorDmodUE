@@ -965,7 +965,7 @@ static int mddi_probe(struct platform_device *pdev)
 		PR_DISP_ERR("mddi: no associated mem resource!\n");
 		return -ENOMEM;
 	}
-	mddi->base = ioremap(resource->start, resource->end - resource->start);
+	mddi->base = ioremap(resource->start, resource_size(resource));
 	if (!mddi->base) {
 		PR_DISP_ERR("mddi: failed to remap base!\n");
 		ret = -EINVAL;
