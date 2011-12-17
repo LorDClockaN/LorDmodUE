@@ -764,7 +764,6 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 	struct ddl_decoder_data *decoder = &(ddl->codec_data.decoder);
 	u32 comv_buf_size = DDL_COMV_BUFLINE_NO, comv_buf_no = 0;
 	u32 ref_buf_no = 0;
-	struct ddl_context  *ddl_ctxt = NULL;
 
 	if (!DDLCLIENT_STATE_IS(ddl, DDL_CLIENT_WAIT_FOR_DPB)) {
 		VIDC_LOG_STRING("STATE-CRITICAL");
@@ -825,12 +824,8 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 	}
 	decoder->ref_buffer.align_physical_addr = NULL;
 	if (ref_buf_no) {
-		size_t sz, align_bytes, y_sz, frm_sz;
-		u32 i = 0;
+		size_t sz, align_bytes;
 		sz = decoder->dp_buf.dec_pic_buffers[0].vcd_frm.alloc_len;
-		frm_sz = sz;
-		y_sz = decoder->client_frame_size.height *
-				decoder->client_frame_size.width;
 		sz *= ref_buf_no;
 		align_bytes = decoder->client_output_buf_req.align;
 		if (decoder->ref_buffer.virtual_base_addr)
@@ -842,18 +837,9 @@ u32 ddl_decode_set_buffers(struct ddl_client_context *ddl)
 			    ("Dec_set_buf:mpeg_ref_buf_alloc_failed");
 			return VCD_ERR_ALLOC_FAIL;
 		}
-		memset((u8 *)decoder->ref_buffer.virtual_base_addr,
-			0x80, sz);
-		for (i = 0; i < ref_buf_no; i++)
-			memset((u8 *)decoder->ref_buffer.align_virtual_addr +
-				i*frm_sz, 0x10, y_sz);
 	}
 	ddl_decode_set_metadata_output(decoder);
 	ddl_decoder_dpb_transact(decoder, NULL, DDL_DPB_OP_INIT);
-	ddl_ctxt = ddl_get_context();
-        vidc_720p_set_deblock_line_buffer(
-                ddl_ctxt->db_line_buffer.align_physical_addr,
-                ddl_ctxt->db_line_buffer.buffer_size);
 	ddl_move_client_state(ddl, DDL_CLIENT_WAIT_FOR_DPBDONE);
 	ddl_move_command_state(ddl->ddl_context, DDL_CMD_DECODE_SET_DPB);
 
