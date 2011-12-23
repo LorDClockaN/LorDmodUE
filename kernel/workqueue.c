@@ -180,6 +180,22 @@ static unsigned int workqueue_debug_level = 0;
 static int wq_pos = 0;
 static unsigned long wq_hist[WQ_HIST_LEN];
 
+static int workqueue_boot_config(char *str)
+{
+	unsigned kernel_flag;
+
+	if (!str)
+		return -EINVAL;
+
+	kernel_flag = simple_strtoul(str, NULL, 16);
+	if (kernel_flag & BIT5)
+		workqueue_debug_level = 1;
+	else
+		workqueue_debug_level = 0;
+	return 0;
+}
+early_param("kernelflag", workqueue_boot_config);
+
 static int store_workqueue(const char *wq_name, unsigned long f_addr)
 {
 	char func_sym[KSYM_SYMBOL_LEN];
@@ -2941,27 +2957,6 @@ void destroy_workqueue(struct workqueue_struct *wq)
 }
 EXPORT_SYMBOL_GPL(destroy_workqueue);
 
-/*int is_workqueue_empty(struct workqueue_struct *wq)
-{
-	int ret = 1, cpu;
-	struct cpu_workqueue_struct *cwq;
-
-	if (wq->singlethread) {
-		cwq = per_cpu_ptr(wq->cpu_wq, singlethread_cpu);
-		ret = list_empty(&cwq->worklist);
-	} else {
-		for_each_possible_cpu(cpu) {
-			cwq = per_cpu_ptr(wq->cpu_wq, cpu);
-			ret = list_empty(&cwq->worklist);
-			if (!ret)
-				break;
-		}
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(is_workqueue_empty); */
-
 /**
  * workqueue_set_max_active - adjust max_active of a workqueue
  * @wq: target workqueue
@@ -3637,10 +3632,6 @@ static int __init init_workqueues(void)
 {
 	unsigned int cpu;
 	int i;
-
-	/* Switch workqueue debug level by kernelflag */
-	if (get_kernel_flag() & BIT5)
-		workqueue_debug_level = 1;
 
 	cpu_notifier(workqueue_cpu_callback, CPU_PRI_WORKQUEUE);
 
