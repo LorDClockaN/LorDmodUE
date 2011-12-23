@@ -78,7 +78,7 @@
 
 #define HAS_ARCH_IO_REMAP_PFN_RANGE
 
-#define CONSISTENT_DMA_SIZE (SZ_1M * 14)
+#define CONSISTENT_DMA_SIZE (4*SZ_1M)
 
 #ifndef __ASSEMBLY__
 void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment);
