@@ -410,10 +410,6 @@ static struct microp_led_config up_led_config[] = {
 		.type = LED_RGB,
 	},
 	{
-                .name = "blue",
-                .type = LED_RGB,
-        },
-	{
 		.name = "button-backlight",
 		.type = LED_PWM,
 		.led_pin = 1 << 0,
