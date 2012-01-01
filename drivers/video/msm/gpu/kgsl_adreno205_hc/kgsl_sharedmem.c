@@ -326,7 +326,6 @@ static void _outer_cache_range_op(int op, unsigned long addr, size_t size)
 		break;
 	}
 
-	mb();
 }
 #endif
 
@@ -616,7 +615,7 @@ kgsl_sharedmem_readl(const struct kgsl_memdesc *memdesc,
 	if (offsetbytes + sizeof(unsigned int) > memdesc->size)
 		return -ERANGE;
 
-	*dst = readl(memdesc->hostptr + offsetbytes);
+	*dst = readl_relaxed(memdesc->hostptr + offsetbytes);
 	return 0;
 }
 EXPORT_SYMBOL(kgsl_sharedmem_readl);
@@ -631,7 +630,7 @@ kgsl_sharedmem_writel(const struct kgsl_memdesc *memdesc,
 
 	kgsl_cffdump_setmem(memdesc->physaddr + offsetbytes,
 		src, sizeof(uint));
-	writel(src, memdesc->hostptr + offsetbytes);
+	writel_relaxed(src, memdesc->hostptr + offsetbytes);
 	return 0;
 }
 EXPORT_SYMBOL(kgsl_sharedmem_writel);
