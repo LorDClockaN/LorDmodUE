@@ -320,8 +320,6 @@ static struct sock *__udp6_lib_lookup_skb(struct sk_buff *skb,
 				 udptable);
 }
 
-EXPORT_SYMBOL_GPL(udp6_lib_lookup);
-
 /*
  * 	This should be easy, if there is something there we
  * 	return it, otherwise we block.
