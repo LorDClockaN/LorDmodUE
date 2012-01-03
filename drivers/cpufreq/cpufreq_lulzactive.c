@@ -36,7 +36,7 @@
 #define LULZACTIVE_AUTHOR	"tegrak"
 
 // if you changed some codes for optimization, just write your name here.
-#define LULZACTIVE_TUNER ""
+#define LULZACTIVE_TUNER "LorD ClockaN"
 
 #define LOGI(fmt...) printk(KERN_INFO "[lulzactive] " fmt)
 #define LOGW(fmt...) printk(KERN_WARNING "[lulzactive] " fmt)
@@ -99,7 +99,7 @@ enum {
 /*
  * CPU freq will be increased if measured load > inc_cpu_load;
  */
-#define DEFAULT_INC_CPU_LOAD 60
+#define DEFAULT_INC_CPU_LOAD 75
 static unsigned long inc_cpu_load;
 
 /*
@@ -271,7 +271,7 @@ static inline unsigned int adjust_screen_off_freq(
 static void cpufreq_lulzactive_timer(unsigned long data)
 {
 	// do not step down if up scaling was stucked by short sampling time by tegrak
-	static unsigned int stuck_on_sampling = 0;
+	static unsigned int stuck_on_sampling = 1;
 	
 	unsigned int delta_idle;
 	unsigned int delta_time;
