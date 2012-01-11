@@ -252,14 +252,10 @@ static inline struct kgsl_device *kgsl_device_from_dev(struct device *dev)
 	return NULL;
 }
 
-static inline int timestamp_cmp(unsigned int new, unsigned int old)
+static inline bool timestamp_cmp(unsigned int new, unsigned int old)
 {
 	int ts_diff = new - old;
-
-  if (ts_diff == 0)
-    return 0;
-
-  return ((ts_diff > 0) || (ts_diff < -20000)) ? 1 : -1;
+	return (ts_diff >= 0) || (ts_diff < -20000);
 }
 
 static inline void

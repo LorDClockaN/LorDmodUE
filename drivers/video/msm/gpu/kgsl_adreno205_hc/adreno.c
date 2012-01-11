@@ -34,6 +34,10 @@
 	 (RBBM_INT_CNTL__RDERR_INT_MASK |  \
 	  RBBM_INT_CNTL__DISPLAY_UPDATE_INT_MASK)
 
+#define GSL_SQ_INT_MASK \
+	(SQ_INT_CNTL__PS_WATCHDOG_MASK | \
+	 SQ_INT_CNTL__VS_WATCHDOG_MASK)
+
 /* Yamato MH arbiter config*/
 #define KGSL_CFG_YAMATO_MHARB \
 	(0x10 \
@@ -187,6 +191,25 @@ static void kgsl_yamato_rbbm_intrcallback(struct kgsl_device *device)
 	kgsl_yamato_regwrite_isr(device, REG_RBBM_INT_ACK, status);
 }
 
+static void kgsl_yamato_sq_intrcallback(struct kgsl_device *device)
+{
+	unsigned int status = 0;
+
+	kgsl_yamato_regread_isr(device, REG_SQ_INT_STATUS, &status);
+
+	if (status & SQ_INT_CNTL__PS_WATCHDOG_MASK)
+		KGSL_DRV_INFO(device, "sq ps watchdog interrupt\n");
+	else if (status & SQ_INT_CNTL__VS_WATCHDOG_MASK)
+		KGSL_DRV_INFO(device, "sq vs watchdog interrupt\n");
+	else
+		KGSL_DRV_WARN(device,
+			"bad bits in REG_SQ_INT_STATUS %08x\n", status);
+
+
+	status &= GSL_SQ_INT_MASK;
+	kgsl_yamato_regwrite_isr(device, REG_SQ_INT_ACK, status);
+}
+
 irqreturn_t kgsl_yamato_isr(int irq, void *data)
 {
 	irqreturn_t result = IRQ_NONE;
@@ -216,14 +239,19 @@ irqreturn_t kgsl_yamato_isr(int irq, void *data)
 		result = IRQ_HANDLED;
 	}
 
-  if (device->requested_state == KGSL_STATE_NONE) {
-    if (device->pwrctrl.nap_allowed == true) {
-      device->requested_state = KGSL_STATE_NAP;
-      queue_work(device->work_queue, &device->idle_check_ws);
-    } else if (device->pwrctrl.idle_pass == true) {
-      queue_work(device->work_queue, &device->idle_check_ws);
-    }
+	if (status & MASTER_INT_SIGNAL__SQ_INT_STAT) {
+		kgsl_yamato_sq_intrcallback(device);
+		result = IRQ_HANDLED;
+	}
+
+	if (device->requested_state == KGSL_STATE_NONE) {
+		if (device->pwrctrl.nap_allowed == true) {
+			device->requested_state = KGSL_STATE_NAP;
+			queue_work(device->work_queue, &device->idle_check_ws);
+		} else if (device->pwrctrl.idle_pass == true) {
+			queue_work(device->work_queue, &device->idle_check_ws);
 		}
+	}
 
 	/* Reset the time-out in our idle timer */
 	mod_timer(&device->idle_timer,
@@ -599,6 +627,8 @@ static int kgsl_yamato_stop(struct kgsl_device *device)
 	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 	del_timer(&device->idle_timer);
 	kgsl_yamato_regwrite(device, REG_RBBM_INT_CNTL, 0);
+
+	kgsl_yamato_regwrite(device, REG_SQ_INT_CNTL, 0);
 
 	yamato_device->drawctxt_active = NULL;
 
@@ -1014,10 +1044,7 @@ static void _yamato_regread(struct kgsl_device *device,
 	BUG_ON(offsetwords*sizeof(uint32_t) >= device->regspace.sizebytes);
 	reg = (unsigned int *)(device->regspace.mmio_virt_base
 				+ (offsetwords << 2));
-  /*ensure this read finishes before the next one.
-   * i.e. act like normal readl() */
-  *value = __raw_readl(reg);
-  rmb();
+	*value = readl(reg);
 }
 
 void kgsl_yamato_regread(struct kgsl_device *device, unsigned int offsetwords,
@@ -1046,10 +1073,8 @@ static void _yamato_regwrite(struct kgsl_device *device,
 	reg = (unsigned int *)(device->regspace.mmio_virt_base
 				+ (offsetwords << 2));
 
-  /*ensure previous writes post before this one,
-   * i.e. act like normal writel() */
-  wmb();
-  __raw_writel(value, reg);
+	writel(value, reg);
+
 }
 
 void kgsl_yamato_regwrite(struct kgsl_device *device, unsigned int offsetwords,
@@ -1077,13 +1102,13 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
 		mutex_lock(&device->mutex);
 		kgsl_sharedmem_readl(&device->memstore, &enableflag,
 			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable));
-		mb();
+		rmb();
 
 		if (enableflag) {
 			kgsl_sharedmem_readl(&device->memstore, &ref_ts,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
-			mb();
-			if (timestamp_cmp(ref_ts, timestamp) >= 0) {
+			rmb();
+			if (timestamp_cmp(ref_ts, timestamp)) {
 				kgsl_sharedmem_writel(&device->memstore,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
 				timestamp);
@@ -1133,7 +1158,9 @@ static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 	long status = 0;
 	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 
-	if (timestamp_cmp(timestamp, yamato_device->ringbuffer.timestamp) > 0) {
+	if (timestamp != yamato_device->ringbuffer.timestamp &&
+		timestamp_cmp(timestamp,
+		yamato_device->ringbuffer.timestamp)) {
 		KGSL_DRV_ERR(device, "Cannot wait for invalid ts: %x, "
 			"rb->timestamp: %x\n",
 			timestamp, yamato_device->ringbuffer.timestamp);
@@ -1188,8 +1215,7 @@ static unsigned int kgsl_yamato_readtimestamp(struct kgsl_device *device,
 	else if (type == KGSL_TIMESTAMP_RETIRED)
 		kgsl_sharedmem_readl(&device->memstore, &timestamp,
 				 KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp));
-  /* Make sure memory is synchronized before restarting the GPU */
-  mb();
+	rmb();
 
 	return timestamp;
 }
