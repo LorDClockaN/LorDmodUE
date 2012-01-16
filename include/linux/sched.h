@@ -1219,10 +1219,15 @@ struct task_struct {
 	unsigned int rt_priority;
 #ifdef CONFIG_SCHED_BFS
 	int time_slice;
-	u64 deadline;
+	/* Virtual deadline in niffies, and when the deadline was set */
+	u64 deadline, deadline_niffy;
 	struct list_head run_list;
 	u64 last_ran;
 	u64 sched_time; /* sched_clock time spent running */
+	/* Number of threads currently requesting CPU time */
+	unsigned long threads_running;
+	/* Depth of forks from init */
+	int fork_depth;
 #ifdef CONFIG_SMP
 	bool sticky; /* Soft affined flag */
 #endif

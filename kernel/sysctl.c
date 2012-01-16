@@ -120,6 +120,8 @@ static int __maybe_unused one_hundred = 100;
 #ifdef CONFIG_SCHED_BFS
 extern int rr_interval;
 extern int sched_iso_cpu;
+extern int group_thread_accounting;
+extern int fork_depth_penalty;
 static int __read_mostly one_thousand = 1000;
 #endif
 #ifdef CONFIG_PRINTK
@@ -816,6 +818,24 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= &zero,
 		.extra2		= &one_hundred,
+	},
+    {
+		.procname	= "group_thread_accounting",
+		.data		= &group_thread_accounting,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
+	{
+		.procname	= "fork_depth_penalty",
+		.data		= &fork_depth_penalty,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
 	},
 #endif
 #if defined(CONFIG_S390) && defined(CONFIG_SMP)
