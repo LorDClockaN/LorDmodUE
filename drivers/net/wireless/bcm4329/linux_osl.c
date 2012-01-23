@@ -155,10 +155,11 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	gfp_t flags;
 
 	flags = (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL;
-	osh = kzalloc(sizeof(osl_t), flags);
+	osh = kmalloc(sizeof(osl_t), flags);
 	ASSERT(osh);
 
-	
+	bzero(osh, sizeof(osl_t));
+
 	
 	ASSERT(ABS(BCME_LAST) == (ARRAYSIZE(linuxbcmerrormap) - 1));
 
@@ -362,8 +363,7 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 	
 	for (i = 0; i < MAX_STATIC_PKT_NUM*2; i++)
 	{
-		if ( (i < MAX_STATIC_PKT_NUM && p == bcm_static_skb->skb_4k[i]) || 
-			(i >= MAX_STATIC_PKT_NUM && p == bcm_static_skb->skb_8k[i-MAX_STATIC_PKT_NUM]) )
+		if (p == bcm_static_skb->skb_4k[i])
 		{
 			mutex_lock(&bcm_static_skb->osl_pkt_sem);
 			bcm_static_skb->pkt_use[i] = 0;
