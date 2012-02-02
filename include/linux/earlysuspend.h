@@ -47,14 +47,11 @@ struct early_suspend {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 void register_early_suspend(struct early_suspend *handler);
 void unregister_early_suspend(struct early_suspend *handler);
-#ifdef CONFIG_HTC_ONMODE_CHARGING
-void register_onchg_suspend(struct early_suspend *handler);
-void unregister_onchg_suspend(struct early_suspend *handler);
-#endif
 #else
 #define register_early_suspend(handler) do { } while (0)
 #define unregister_early_suspend(handler) do { } while (0)
 #endif
 
 #endif
+
 
