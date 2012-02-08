@@ -25,6 +25,9 @@
  * $Id: dhd_linux.c,v 1.65.4.9.2.12.2.104.4.40 2011/02/03 19:55:18 Exp $
  */
 
+#ifdef CONFIG_WIFI_CONTROL_FUNC
+#include <linux/platform_device.h>
+#endif
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -42,6 +45,7 @@
 #include <linux/fs.h>
 #include <linux/inetdevice.h>
 #include <linux/mutex.h>
+#include <linux/sched.h>
 
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -60,14 +64,14 @@
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
 #endif
-#ifdef CUSTOMER_HW2
-#include <linux/platform_device.h>
-#ifdef CONFIG_WIFI_CONTROL_FUNC
+#if defined(CUSTOMER_HW2) && defined(CONFIG_WIFI_CONTROL_FUNC)
 #include <linux/wlan_plat.h>
-static struct wifi_platform_data *wifi_control_data = NULL;
-#endif
+
 struct semaphore wifi_control_sem;
 
+struct dhd_bus *g_bus;
+
+static struct wifi_platform_data *wifi_control_data = NULL;
 static struct resource *wifi_irqres = NULL;
 
 int wifi_get_irq_number(unsigned long *irq_flags_ptr)
@@ -86,22 +90,18 @@ int wifi_get_irq_number(unsigned long *irq_flags_ptr)
 int wifi_set_carddetect(int on)
 {
 	printk("%s = %d\n", __FUNCTION__, on);
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	if (wifi_control_data && wifi_control_data->set_carddetect) {
 		wifi_control_data->set_carddetect(on);
 	}
-#endif
 	return 0;
 }
 
 int wifi_set_power(int on, unsigned long msec)
 {
 	printk("%s = %d\n", __FUNCTION__, on);
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	if (wifi_control_data && wifi_control_data->set_power) {
 		wifi_control_data->set_power(on);
 	}
-#endif
 	if (msec)
 		mdelay(msec);
 	return 0;
@@ -110,11 +110,9 @@ int wifi_set_power(int on, unsigned long msec)
 int wifi_set_reset(int on, unsigned long msec)
 {
 	DHD_TRACE(("%s = %d\n", __FUNCTION__, on));
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	if (wifi_control_data && wifi_control_data->set_reset) {
 		wifi_control_data->set_reset(on);
 	}
-#endif
 	if (msec)
 		mdelay(msec);
 	return 0;
@@ -125,38 +123,31 @@ int wifi_get_mac_addr(unsigned char *buf)
 	DHD_TRACE(("%s\n", __FUNCTION__));
 	if (!buf)
 		return -EINVAL;
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	if (wifi_control_data && wifi_control_data->get_mac_addr) {
 		return wifi_control_data->get_mac_addr(buf);
 	}
-#endif
 	return -EOPNOTSUPP;
 }
 
 void *wifi_get_country_code(char *ccode)
 {
 	DHD_TRACE(("%s\n", __FUNCTION__));
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	if (!ccode)
 		return NULL;
 	if (wifi_control_data && wifi_control_data->get_country_code) {
 		return wifi_control_data->get_country_code(ccode);
 	}
-#endif
 	return NULL;
 }
 
 static int wifi_probe(struct platform_device *pdev)
 {
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	struct wifi_platform_data *wifi_ctrl =
 		(struct wifi_platform_data *)(pdev->dev.platform_data);
 
-	wifi_control_data = wifi_ctrl;
-#endif
-
 	DHD_TRACE(("## %s\n", __FUNCTION__));
 	wifi_irqres = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "bcm4329_wlan_irq");
+	wifi_control_data = wifi_ctrl;
 
 	wifi_set_power(1, 0);	/* Power On */
 	wifi_set_carddetect(1);	/* CardDetect (0->1) */
@@ -167,13 +158,12 @@ static int wifi_probe(struct platform_device *pdev)
 
 static int wifi_remove(struct platform_device *pdev)
 {
-#ifdef CONFIG_WIFI_CONTROL_FUNC
 	struct wifi_platform_data *wifi_ctrl =
 		(struct wifi_platform_data *)(pdev->dev.platform_data);
 
-	wifi_control_data = wifi_ctrl;
-#endif
 	DHD_TRACE(("## %s\n", __FUNCTION__));
+	wifi_control_data = wifi_ctrl;
+
 	wifi_set_power(0, 0);	/* Power Off */
 	wifi_set_carddetect(0);	/* CardDetect (1->0) */
 
@@ -219,7 +209,7 @@ void wifi_del_dev(void)
 	DHD_TRACE(("## Unregister platform_driver_register\n"));
 	platform_driver_unregister(&wifi_device);
 }
-#endif /* defined(CUSTOMER_HW2) */
+#endif /* defined(CUSTOMER_HW2) && defined(CONFIG_WIFI_CONTROL_FUNC) */
 
 static int dhd_device_event(struct notifier_block *this, unsigned long event,
 				void *ptr);
@@ -348,7 +338,11 @@ struct semaphore dhd_registration_sem;
 #define DHD_REGISTRATION_TIMEOUT  12000  /* msec : allowed time to finished dhd registration */
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
 /* load firmware and/or nvram values from the filesystem */
+#ifdef ICS_CONFIG
+module_param_string(firmware_path, firmware_path, MOD_PARAM_PATHLEN, 0660);
+#else
 module_param_string(firmware_path, firmware_path, MOD_PARAM_PATHLEN, 0);
+#endif
 module_param_string(nvram_path, nvram_path, MOD_PARAM_PATHLEN, 0);
 
 /* Error bits */
@@ -564,7 +558,7 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
-	int power_mode = PM_MAX;
+	int power_mode = PM_FAST;
 	/* wl_pkt_filter_enable_t	enable_parm; */
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
@@ -1942,6 +1936,17 @@ dhd_open(struct net_device *net)
 	uint32 toe_ol;
 #endif
 	int ifidx;
+#ifdef ICS_CONFIG
+	int32 ret = 0;
+	dhd_os_wake_lock(&dhd->pub);
+	/* Update FW path if it was changed */
+	if ((firmware_path != NULL) && (firmware_path[0] != '\0')) {
+		if (firmware_path[strlen(firmware_path)-1] == '\n')
+			firmware_path[strlen(firmware_path)-1] = '\0';
+		strcpy(fw_path, firmware_path);
+		firmware_path[0] = '\0';
+	}
+#endif
 
 	/*  Force start if ifconfig_up gets called before START command */
 	wl_control_wl_start(net);
@@ -1954,7 +1959,12 @@ dhd_open(struct net_device *net)
 
 	if ((dhd->iflist[ifidx]) && (dhd->iflist[ifidx]->state == WLC_E_IF_DEL)) {
 		DHD_ERROR(("%s: Error: called when IF already deleted\n", __FUNCTION__));
+#ifdef ICS_CONFIG
+		ret = -1;
+		goto exit;
+#else
 		return -1;
+#endif
 	}
 
 	if (ifidx == 0) { /* do it only for primary eth0 */
@@ -1976,7 +1986,13 @@ dhd_open(struct net_device *net)
 	dhd->pub.up = 1;
 
 	OLD_MOD_INC_USE_COUNT;
+#ifdef ICS_CONFIG
+exit:
+	dhd_os_wake_unlock(&dhd->pub);
+	return ret;
+#else
 	return 0;
+#endif
 }
 
 osl_t *
@@ -2195,6 +2211,9 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	 */
 	memcpy(netdev_priv(net), &dhd, sizeof(dhd));
 
+#if defined(CUSTOMER_HW2) && defined(CONFIG_WIFI_CONTROL_FUNC)
+	g_bus = bus;
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 	register_pm_notifier(&dhd_sleep_pm_notifier);
 #endif /*  (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP) */
@@ -3203,20 +3222,20 @@ int net_os_send_hang_message(struct net_device *dev)
 	return ret;
 }
 
-void dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec)
+void dhd_bus_country_set(struct net_device *dev, char *country_code)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
 
 	if (dhd && dhd->pub.up)
-		memcpy(&dhd->pub.dhd_cspec, cspec, sizeof(wl_country_t));
+		strncpy(dhd->pub.country_code, country_code, WLC_CNTRY_BUF_SZ);
 }
 
 char *dhd_bus_country_get(struct net_device *dev)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
 
-	if (dhd && (dhd->pub.dhd_cspec.ccode[0] != 0))
-		return dhd->pub.dhd_cspec.ccode;
+	if (dhd && (dhd->pub.country_code[0] != 0))
+		return dhd->pub.country_code;
 	return NULL;
 }
 
