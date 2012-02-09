@@ -319,4 +319,10 @@ config DM_UEVENT
 	---help---
 	Generate udev events for DM events.
 
+config DM_CACHE
+	tristate "Cache target support (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Support for generic cache target for device-mapper.
+
 endif # MD
