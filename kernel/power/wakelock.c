@@ -30,6 +30,7 @@ enum {
 	DEBUG_SUSPEND = 1U << 2,
 	DEBUG_EXPIRE = 1U << 3,
 	DEBUG_WAKE_LOCK = 1U << 4,
+	DEBUG_DESTROY = 1U << 5,
 };
 static int debug_mask = DEBUG_EXIT_SUSPEND | DEBUG_WAKEUP;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -465,7 +466,7 @@ EXPORT_SYMBOL(wake_lock_init);
 void wake_lock_destroy(struct wake_lock *lock)
 {
 	unsigned long irqflags;
-	if (debug_mask & DEBUG_WAKE_LOCK)
+	if (debug_mask & (DEBUG_WAKE_LOCK | DEBUG_DESTROY))
 		pr_info("wake_lock_destroy name=%s\n", lock->name);
 	spin_lock_irqsave(&list_lock, irqflags);
 	lock->flags &= ~WAKE_LOCK_INITIALIZED;
