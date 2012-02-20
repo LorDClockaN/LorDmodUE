@@ -58,3 +58,5 @@ ifeq ($(CONFIG_BCM4329_PURE_ANDROID),y)
 else
   obj-$(CONFIG_BCM4329)	+= bcm4329_204/
 endif
+
+  obj-$(CONFIG_BCM4329)	+= bcmdhd/
