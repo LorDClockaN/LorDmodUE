@@ -53,8 +53,6 @@
 
 #define VID_DEC_NAME		"msm_vidc_dec"
 
-extern int wlan_ioprio_idle;
-
 static struct switch_dev vdec_switch = {
 	.name = "vdec", /* This is not typo. We use same uevent as encoder */
 };
@@ -1342,7 +1340,6 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		if (!result)
 			return -EIO;
 		switch_set_state(&vdec_switch, VDEC_STATE_ON);
-		wlan_ioprio_idle = 1;
 		break;
 	}
 	case VDEC_IOCTL_CMD_STOP:
@@ -1350,7 +1347,6 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		DBG("VDEC_IOCTL_CMD_STOP\n");
 		result = vid_dec_start_stop(client_ctx, false);
 		switch_set_state(&vdec_switch, VDEC_STATE_OFF);
-		wlan_ioprio_idle = 0;
 		if (!result)
 			return -EIO;
 		break;
@@ -1724,7 +1720,6 @@ static int vid_dec_release(struct inode *inode, struct file *file)
 	vidc_disable_clk();
 #endif
 	switch_set_state(&vdec_switch, VDEC_STATE_OFF);
-	wlan_ioprio_idle = 0;
 	INFO("msm_vidc_dec: Return from %s()", __func__);
 	return 0;
 }
