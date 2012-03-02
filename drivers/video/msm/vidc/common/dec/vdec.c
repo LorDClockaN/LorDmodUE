@@ -32,7 +32,6 @@
 #include <linux/workqueue.h>
 #include <linux/android_pmem.h>
 #include <linux/clk.h>
-#include <linux/switch.h>
 #include <linux/timer.h>
 
 #include "vidc_type.h"
@@ -52,13 +51,6 @@
 #define ERR(x...) printk(KERN_ERR x)
 
 #define VID_DEC_NAME		"msm_vidc_dec"
-
-static struct switch_dev vdec_switch = {
-	.name = "vdec", /* This is not typo. We use same uevent as encoder */
-};
-
-#define VDEC_STATE_OFF 0
-#define VDEC_STATE_ON  (1 << 0)
 
 static struct vid_dec_dev *vid_dec_device_p;
 static dev_t vid_dec_dev_num;
@@ -912,15 +904,15 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 	struct vid_dec_msg *vdec_msg = NULL;
 	u32 vcd_status;
 
-	INFO("msm_vidc_dec: Inside %s()", __func__);
+	INFO("\n msm_vidc_dec: Inside %s()", __func__);
 	if (!client_ctx) {
-		ERR("Invalid client_ctx");
+		ERR("\n Invalid client_ctx");
 		return false;
 	}
 
 	if (start) {
 		if (client_ctx->seq_header_set) {
-			INFO("%s(): Seq Hdr set: Send START_DONE to client",
+			INFO("\n %s(): Seq Hdr set: Send START_DONE to client",
 				 __func__);
 			vdec_msg = kzalloc(sizeof(*vdec_msg), GFP_KERNEL);
 			if (!vdec_msg) {
@@ -1155,7 +1147,7 @@ static int vid_dec_get_next_msg(struct video_client_ctx *client_ctx,
 		kfree(vid_dec_msg);
 	}
 	mutex_unlock(&client_ctx->msg_queue_lock);
-	return true;
+	return 0;
 }
 
 static int vid_dec_ioctl(struct inode *inode, struct file *file,
@@ -1339,14 +1331,12 @@ static int vid_dec_ioctl(struct inode *inode, struct file *file,
 		result = vid_dec_start_stop(client_ctx, true);
 		if (!result)
 			return -EIO;
-		switch_set_state(&vdec_switch, VDEC_STATE_ON);
 		break;
 	}
 	case VDEC_IOCTL_CMD_STOP:
 	{
 		DBG("VDEC_IOCTL_CMD_STOP\n");
 		result = vid_dec_start_stop(client_ctx, false);
-		switch_set_state(&vdec_switch, VDEC_STATE_OFF);
 		if (!result)
 			return -EIO;
 		break;
@@ -1719,8 +1709,7 @@ static int vid_dec_release(struct inode *inode, struct file *file)
 #ifndef USE_RES_TRACKER
 	vidc_disable_clk();
 #endif
-	switch_set_state(&vdec_switch, VDEC_STATE_OFF);
-	INFO("msm_vidc_dec: Return from %s()", __func__);
+	INFO("\n msm_vidc_dec: Return from %s()", __func__);
 	return 0;
 }
 
@@ -1842,9 +1831,6 @@ static int __init vid_dec_init(void)
 		goto error_vid_dec_cdev_add;
 	}
 	vid_dec_vcd_init();
-	if (switch_dev_register(&vdec_switch) < 0) {
-		printk(KERN_ERR "vdec: fail to register vdec switch!\n");
-	}
 	return 0;
 
 error_vid_dec_cdev_add:
