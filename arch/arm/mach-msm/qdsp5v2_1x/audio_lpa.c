@@ -494,6 +494,8 @@ static void audlpa_async_send_buffer(struct audio *audio)
 
 			if ((signed)(temp >= 0) &&
 			((signed)(next_buf->buf.data_len - temp) >= 0)) {
+				MM_DBG("audlpa_async_send_buffer - sending the"
+					"rest of the buffer bassedon AV sync");
 				cmd.buf_ptr	= (unsigned) (next_buf->paddr +
 						  (next_buf->buf.data_len -
 						   temp));
@@ -501,6 +503,21 @@ static void audlpa_async_send_buffer(struct audio *audio)
 				cmd.partition_number	= 0;
 				audio->bytecount_given =
 					audio->bytecount_consumed + temp;
+				wmb();
+				audplay_send_queue0(audio, &cmd, sizeof(cmd));
+				audio->out_needed = 0;
+				audio->drv_status |= ADRV_STATUS_OBUF_GIVEN;
+			} else if ((signed)(temp >= 0) &&
+				((signed)(next_buf->buf.data_len -
+							temp) < 0)) {
+				MM_DBG("audlpa_async_send_buffer - else case:"
+					"sending the rest of the buffer bassedon"
+					"AV sync");
+				cmd.buf_ptr	= (unsigned) next_buf->paddr;
+				cmd.buf_size = next_buf->buf.data_len >> 1;
+				cmd.partition_number	= 0;
+				audio->bytecount_given = audio->bytecount_head +
+					next_buf->buf.data_len;
 				wmb();
 				audplay_send_queue0(audio, &cmd, sizeof(cmd));
 				audio->out_needed = 0;
@@ -1093,6 +1110,15 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		audio->wflush = 1;
 		audio_ioport_reset(audio);
 		if (audio->running) {
+			if (!(audio->drv_status & ADRV_STATUS_PAUSE)) {
+				rc = audpp_pause(audio->dec_id, (int) arg);
+				if (rc < 0) {
+					MM_ERR("%s: pause cmd failed rc=%d\n",
+						__func__, rc);
+					rc = -EINTR;
+					break;
+				}
+			}
 			audpp_flush(audio->dec_id);
 			rc = wait_event_interruptible(audio->write_wait,
 				!audio->wflush);
