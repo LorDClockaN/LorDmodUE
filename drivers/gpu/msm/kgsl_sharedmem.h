@@ -30,12 +30,12 @@ struct kgsl_process_private;
 /** Set if the memdesc describes cached memory */
 #define KGSL_MEMFLAGS_CACHED    0x00000001
 
-extern struct kgsl_memdesc_ops kgsl_vmalloc_ops;
+extern struct kgsl_memdesc_ops kgsl_page_alloc_ops;
 
-int kgsl_sharedmem_vmalloc(struct kgsl_memdesc *memdesc,
+int kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 			   struct kgsl_pagetable *pagetable, size_t size);
 
-int kgsl_sharedmem_vmalloc_user(struct kgsl_memdesc *memdesc,
+int kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 				struct kgsl_pagetable *pagetable,
 				size_t size, int flags);
 
@@ -132,7 +132,7 @@ kgsl_allocate(struct kgsl_memdesc *memdesc,
 {
 	if (kgsl_mmu_get_mmutype() == KGSL_MMU_TYPE_NONE)
 		return kgsl_sharedmem_ebimem(memdesc, pagetable, size);
-	return kgsl_sharedmem_vmalloc(memdesc, pagetable, size);
+	return kgsl_sharedmem_page_alloc(memdesc, pagetable, size);
 }
 
 static inline int
@@ -143,7 +143,7 @@ kgsl_allocate_user(struct kgsl_memdesc *memdesc,
 	if (kgsl_mmu_get_mmutype() == KGSL_MMU_TYPE_NONE)
 		return kgsl_sharedmem_ebimem_user(memdesc, pagetable, size,
 						  flags);
-	return kgsl_sharedmem_vmalloc_user(memdesc, pagetable, size, flags);
+	return kgsl_sharedmem_page_alloc_user(memdesc, pagetable, size, flags);
 }
 
 static inline int
