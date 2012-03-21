@@ -14,6 +14,7 @@
 #include <linux/debugfs.h>
 
 #include "kgsl.h"
+#include "kgsl_device.h"
 
 /*default log levels is error for everything*/
 #define KGSL_LOG_LEVEL_DEFAULT 3
@@ -78,4 +79,9 @@ void kgsl_device_debugfs_init(struct kgsl_device *device)
 void kgsl_core_debugfs_init(void)
 {
 	kgsl_debugfs_dir = debugfs_create_dir("kgsl", 0);
+}
+
+void kgsl_core_debugfs_close(void)
+{
+	debugfs_remove_recursive(kgsl_debugfs_dir);
 }

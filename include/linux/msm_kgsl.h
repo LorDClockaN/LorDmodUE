@@ -1,31 +1,3 @@
-/* Copyright (c) 2002,2007-2011, Code Aurora Forum. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials provided
- *       with the distribution.
- *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- */
 #ifndef _MSM_KGSL_H
 #define _MSM_KGSL_H
 
@@ -37,6 +9,7 @@
 #define KGSL_CONTEXT_NO_GMEM_ALLOC	2
 #define KGSL_CONTEXT_SUBMIT_IB_LIST	4
 #define KGSL_CONTEXT_CTX_SWITCH	8
+#define KGSL_CONTEXT_PREAMBLE	16
 
 /* Memory allocayion flags */
 #define KGSL_MEMFLAGS_GPUREADONLY	0x01000000
@@ -53,31 +26,33 @@
 #define KGSL_FLAGS_RESERVED2   0x00000080
 #define KGSL_FLAGS_SOFT_RESET  0x00000100
 
+/* Clock flags to show which clocks should be controled by a given platform */
+#define KGSL_CLK_SRC	0x00000001
+#define KGSL_CLK_CORE	0x00000002
+#define KGSL_CLK_IFACE	0x00000004
+#define KGSL_CLK_MEM	0x00000008
+#define KGSL_CLK_MEM_IFACE 0x00000010
+#define KGSL_CLK_AXI	0x00000020
+
 #define KGSL_MAX_PWRLEVELS 5
+
+#define KGSL_CONVERT_TO_MBPS(val) \
+	(val*1000*1000U)
 
 /* device id */
 enum kgsl_deviceid {
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO220) || defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
-	KGSL_DEVICE_YAMATO	= 0x00000000,
+	KGSL_DEVICE_3D0		= 0x00000000,
 	KGSL_DEVICE_2D0		= 0x00000001,
 	KGSL_DEVICE_2D1		= 0x00000002,
 	KGSL_DEVICE_MAX		= 0x00000003
-#elif defined(CONFIG_GPU_MSM_KGSL_ADRENO205)
-	KGSL_DEVICE_YAMATO	= 0x00000000,
-	KGSL_DEVICE_G12		= 0x00000001,
-	KGSL_DEVICE_MAX		= 0x00000002
-#else
-	KGSL_DEVICE_ANY		= 0x00000000,
-	KGSL_DEVICE_YAMATO	= 0x00000001,
-	KGSL_DEVICE_G12		= 0x00000002,
-	KGSL_DEVICE_MAX		= 0x00000002
-#endif
 };
 
 enum kgsl_user_mem_type {
 	KGSL_USER_MEM_TYPE_PMEM		= 0x00000000,
 	KGSL_USER_MEM_TYPE_ASHMEM	= 0x00000001,
-	KGSL_USER_MEM_TYPE_ADDR		= 0x00000002
+	KGSL_USER_MEM_TYPE_ADDR		= 0x00000002,
+	KGSL_USER_MEM_TYPE_ION		= 0x00000003,
+	KGSL_USER_MEM_TYPE_MAX		= 0x00000004,
 };
 
 struct kgsl_devinfo {
@@ -110,10 +85,8 @@ struct kgsl_devmemstore {
 	unsigned int sbz3;
 	volatile unsigned int ref_wait_ts;
 	unsigned int sbz4;
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
 	unsigned int current_context;
 	unsigned int sbz5;
-#endif
 };
 
 #define KGSL_DEVICE_MEMSTORE_OFFSET(field) \
@@ -136,9 +109,7 @@ enum kgsl_property_type {
 	KGSL_PROP_SHMEM_APERTURES = 0x00000005,
 	KGSL_PROP_MMU_ENABLE 	  = 0x00000006,
 	KGSL_PROP_INTERRUPT_WAITS = 0x00000007,
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
 	KGSL_PROP_VERSION         = 0x00000008,
-#endif
 };
 
 struct kgsl_shadowprop {
@@ -147,38 +118,10 @@ struct kgsl_shadowprop {
 	unsigned int flags; /* contains KGSL_FLAGS_ values */
 };
 
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO205) || defined(CONFIG_ARCH_MSM8X60)
-#include <mach/msm_bus.h>
-struct kgsl_platform_data {
-	unsigned int high_axi_2d;
-	unsigned int high_axi_3d;
-	unsigned int max_grp2d_freq;
-	unsigned int min_grp2d_freq;
-	int (*set_grp2d_async)(void);
-	unsigned int max_grp3d_freq;
-	unsigned int min_grp3d_freq;
-	int (*set_grp3d_async)(void);
-	const char *imem_clk_name;
-	const char *imem_pclk_name;
-	const char *grp3d_clk_name;
-	const char *grp3d_pclk_name;
-	const char *grp2d0_clk_name;
-	const char *grp2d0_pclk_name;
-	const char *grp2d1_clk_name;
-	const char *grp2d1_pclk_name;
-	unsigned int idle_timeout_2d;
-	unsigned int idle_timeout_3d;
-	struct msm_bus_scale_pdata *grp3d_bus_scale_table;
-	struct msm_bus_scale_pdata *grp2d0_bus_scale_table;
-	struct msm_bus_scale_pdata *grp2d1_bus_scale_table;
-	unsigned int nap_allowed;
-	unsigned int pt_va_size;
-	unsigned int pt_max_count;
-};
-#elif defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
 struct kgsl_pwrlevel {
 	unsigned int gpu_freq;
 	unsigned int bus_freq;
+	unsigned int io_fraction;
 };
 
 struct kgsl_version {
@@ -188,7 +131,7 @@ struct kgsl_version {
 	unsigned int dev_minor;
 };
 
-#include <mach/msm_bus.h>
+#ifdef __KERNEL__
 
 #define KGSL_3D0_REG_MEMORY	"kgsl_3d0_reg_memory"
 #define KGSL_3D0_IRQ		"kgsl_3d0_irq"
@@ -202,27 +145,19 @@ struct kgsl_grp_clk_name {
 	const char *pclk;
 };
 
-struct kgsl_device_pwr_data {
+struct kgsl_device_platform_data {
 	struct kgsl_pwrlevel pwrlevel[KGSL_MAX_PWRLEVELS];
 	int init_level;
 	int num_levels;
 	int (*set_grp_async)(void);
 	unsigned int idle_timeout;
 	unsigned int nap_allowed;
-	bool pwrrail_first;
-	unsigned int idle_pass;
-};
-
-struct kgsl_clk_data {
-	struct kgsl_grp_clk_name name;
-	struct msm_bus_scale_pdata *bus_scale_table;
-};
-
-struct kgsl_device_platform_data {
-	struct kgsl_device_pwr_data pwr_data;
-	struct kgsl_clk_data clk;
-	/* imem_clk_name is for 3d only, not used in 2d devices */
+	struct kgsl_grp_clk_name clk;
 	struct kgsl_grp_clk_name imem_clk_name;
+	unsigned int idle_needed;
+	struct msm_bus_scale_pdata *bus_scale_table;
+	const char *iommu_user_ctx_name;
+	const char *iommu_priv_ctx_name;
 };
 
 #endif
@@ -282,18 +217,6 @@ struct kgsl_device_waittimestamp {
 #define IOCTL_KGSL_DEVICE_WAITTIMESTAMP \
 	_IOW(KGSL_IOC_TYPE, 0x6, struct kgsl_device_waittimestamp)
 
-struct kgsl_cff_user_event {
-	unsigned char cff_opcode;
-	unsigned int op1;
-	unsigned int op2;
-	unsigned int op3;
-	unsigned int op4;
-	unsigned int op5;
-	unsigned int __pad[2];
-};
-
-#define IOCTL_KGSL_CFF_USER_EVENT \
-	_IOW(KGSL_IOC_TYPE, 0x31, struct kgsl_cff_user_event)
 
 /* issue indirect commands to the GPU.
  * drawctxt_id must have been created with IOCTL_KGSL_DRAWCTXT_CREATE
@@ -304,7 +227,6 @@ struct kgsl_cff_user_event {
  * other ioctls to determine when the commands have been executed by
  * the GPU.
  */
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO220) || defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
 struct kgsl_ringbuffer_issueibcmds {
 	unsigned int drawctxt_id;
 	unsigned int ibdesc_addr;
@@ -312,15 +234,6 @@ struct kgsl_ringbuffer_issueibcmds {
 	unsigned int timestamp; /*output param */
 	unsigned int flags;
 };
-#else
-struct kgsl_ringbuffer_issueibcmds {
-	unsigned int drawctxt_id;
-	unsigned int ibaddr;
-	unsigned int sizedwords;
-	unsigned int timestamp; /*output param */
-	unsigned int flags;
-};
-#endif
 
 #define IOCTL_KGSL_RINGBUFFER_ISSUEIBCMDS \
 	_IOWR(KGSL_IOC_TYPE, 0x10, struct kgsl_ringbuffer_issueibcmds)
@@ -349,7 +262,7 @@ struct kgsl_cmdstream_freememontimestamp {
 	unsigned int type;
 	unsigned int timestamp;
 };
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
+
 #define IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP \
 	_IOW(KGSL_IOC_TYPE, 0x12, struct kgsl_cmdstream_freememontimestamp)
 
@@ -361,10 +274,7 @@ struct kgsl_cmdstream_freememontimestamp {
 
 #define IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP_OLD \
 	_IOR(KGSL_IOC_TYPE, 0x12, struct kgsl_cmdstream_freememontimestamp)
-#else
-#define IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP \
-	_IOR(KGSL_IOC_TYPE, 0x12, struct kgsl_cmdstream_freememontimestamp)
-#endif
+
 /* create a draw context, which is used to preserve GPU state.
  * The flags field may contain a mask KGSL_CONTEXT_*  values
  */
@@ -419,6 +329,19 @@ struct kgsl_sharedmem_free {
 #define IOCTL_KGSL_SHAREDMEM_FREE \
 	_IOW(KGSL_IOC_TYPE, 0x21, struct kgsl_sharedmem_free)
 
+struct kgsl_cff_user_event {
+	unsigned char cff_opcode;
+	unsigned int op1;
+	unsigned int op2;
+	unsigned int op3;
+	unsigned int op4;
+	unsigned int op5;
+	unsigned int __pad[2];
+};
+
+#define IOCTL_KGSL_CFF_USER_EVENT \
+	_IOW(KGSL_IOC_TYPE, 0x31, struct kgsl_cff_user_event)
+
 struct kgsl_gmem_desc {
 	unsigned int x;
 	unsigned int y;
@@ -428,9 +351,9 @@ struct kgsl_gmem_desc {
 };
 
 struct kgsl_buffer_desc {
-	void 		*hostptr;
+	void 			*hostptr;
 	unsigned int	gpuaddr;
-	int		size;
+	int				size;
 	unsigned int	format;
 	unsigned int  	pitch;
 	unsigned int  	enabled;
@@ -452,13 +375,7 @@ struct kgsl_bind_gmem_shadow {
 struct kgsl_sharedmem_from_vmalloc {
 	unsigned int gpuaddr;	/*output param */
 	unsigned int hostptr;
-#if defined(CONFIG_GPU_MSM_KGSL_ADRENO205) || defined(CONFIG_GPU_MSM_KGSL_ADRENO220) || defined(CONFIG_GPU_MSM_KGSL_ADRENO205_HC)
 	unsigned int flags;
-#else
-	/* If set from user space then will attempt to
-	 * allocate even if low watermark is crossed */
-	int force_no_low_watermark;
-#endif
 };
 
 #define IOCTL_KGSL_SHAREDMEM_FROM_VMALLOC \

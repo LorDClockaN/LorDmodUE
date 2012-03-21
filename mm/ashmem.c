@@ -361,8 +361,7 @@ static int ashmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	if (!nr_to_scan)
 		return lru_count;
 
-	if (!mutex_trylock(&ashmem_mutex))
-		return -1;
+	mutex_lock(&ashmem_mutex);
 	list_for_each_entry_safe(range, next, &ashmem_lru_list, lru) {
 		struct inode *inode = range->asma->file->f_dentry->d_inode;
 		loff_t start = range->pgstart * PAGE_SIZE;
@@ -663,6 +662,8 @@ static unsigned int virtaddr_to_physaddr(unsigned int virtaddr)
 	pte = *pte_ptr;
 	physaddr = pte_pfn(pte);
 	pte_unmap(pte_ptr);
+done:
+	spin_unlock(&current->mm->page_table_lock);
 	physaddr <<= PAGE_SHIFT;
 	return physaddr;
 }
@@ -670,13 +671,12 @@ static unsigned int virtaddr_to_physaddr(unsigned int virtaddr)
 
 static int ashmem_cache_op(struct ashmem_area *asma,
 	void (*cache_func)(unsigned long vstart, unsigned long length,
-		unsigned long pstart))
+				unsigned long pstart))
 {
 #ifdef CONFIG_OUTER_CACHE
 	unsigned long vaddr;
 #endif
 	mutex_lock(&ashmem_mutex);
-
 #ifndef CONFIG_OUTER_CACHE
 	cache_func(asma->vm_start, asma->size, 0);
 #else
@@ -684,9 +684,9 @@ static int ashmem_cache_op(struct ashmem_area *asma,
 		vaddr += PAGE_SIZE) {
 		unsigned long physaddr;
 		physaddr = virtaddr_to_physaddr(vaddr);
-	if (!physaddr)
-		return -EINVAL;
-	cache_func(vaddr, PAGE_SIZE, physaddr);
+		if (!physaddr)
+			return -EINVAL;
+		cache_func(vaddr, PAGE_SIZE, physaddr);
 	}
 #endif
 	mutex_unlock(&ashmem_mutex);
