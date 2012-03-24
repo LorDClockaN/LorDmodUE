@@ -875,6 +875,11 @@ static int soc_suspend(struct device *dev)
 	struct snd_soc_codec *codec = card->codec;
 	int i;
 
+	if (!card->instantiated) {
+		dev_dbg(card->dev, "uninsantiated card found card->name = %s\n",
+			card->name);
+		return 0;
+	}
 	/* If the initialization of this soc device failed, there is no codec
 	 * associated with it. Just bail out in this case.
 	 */
@@ -1088,6 +1093,11 @@ static int soc_resume(struct device *dev)
 	if (!card->codec)
 		return 0;
 
+	if (!card->instantiated) {
+		dev_dbg(card->dev, "uninsantiated card found card->name = %s\n",
+			card->name);
+		return 0;
+	}
 	/* AC97 devices might have other drivers hanging off them so
 	 * need to resume immediately.  Other drivers don't have that
 	 * problem and may take a substantial amount of time to resume
