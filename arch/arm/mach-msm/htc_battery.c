@@ -1780,8 +1780,14 @@ static int handle_battery_call(struct msm_rpc_server *server,
 
 		if (htc_batt_debug_mask & HTC_BATT_DEBUG_M2A_RPC)
 			BATT_LOG("M2A_RPC: set_charging: %d", args->enable);
-		if (htc_batt_info.charger == SWITCH_CHARGER_TPS65200)
-			tps_set_charger_ctrl(args->enable);
+		if (htc_batt_info.charger == SWITCH_CHARGER_TPS65200) {
+      
+			if (args->enable == POWER_SUPPLY_ENABLE_SLOW_CHARGE && 
+				htc_batt_info.rep.batt_temp < 400)
+				tps_set_charger_ctrl(POWER_SUPPLY_ENABLE_FAST_CHARGE);
+			else
+				tps_set_charger_ctrl(args->enable);
+		}
 		else if (htc_batt_info.charger == SWITCH_CHARGER)
 			blocking_notifier_call_chain(&cable_status_notifier_list,
 				args->enable, NULL);
