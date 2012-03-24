@@ -240,7 +240,7 @@ void attr_clear(WINDOW * win, int height, int width, chtype attr)
 {
 	int i, j;
 
-	wattrset(win, attr);
+	(void)wattrset(win, attr);
 	for (i = 0; i < height; i++) {
 		wmove(win, i, 0);
 		for (j = 0; j < width; j++)
@@ -256,7 +256,7 @@ void dialog_clear(void)
 	if (dlg.backtitle != NULL) {
 		int i;
 
-		wattrset(stdscr, dlg.screen.atr);
+		(void)wattrset(stdscr, dlg.screen.atr);
 		mvwaddstr(stdscr, 0, 1, (char *)dlg.backtitle);
 		wmove(stdscr, 1, 1);
 		for (i = 1; i < COLS - 1; i++)
@@ -313,7 +313,7 @@ void print_title(WINDOW *dialog, const char *title, int width)
 {
 	if (title) {
 		int tlen = MIN(width - 2, strlen(title));
-		wattrset(dialog, dlg.title.atr);
+		(void)wattrset(dialog, dlg.title.atr);
 		mvwaddch(dialog, 0, (width - tlen) / 2 - 1, ' ');
 		mvwaddnstr(dialog, 0, (width - tlen)/2, title, tlen);
 		waddch(dialog, ' ');
@@ -393,22 +393,22 @@ void print_button(WINDOW * win, const char *label, int y, int x, int selected)
 	int i, temp;
 
 	wmove(win, y, x);
-	wattrset(win, selected ? dlg.button_active.atr
+	(void)wattrset(win, selected ? dlg.button_active.atr
 		 : dlg.button_inactive.atr);
 	waddstr(win, "<");
 	temp = strspn(label, " ");
 	label += temp;
-	wattrset(win, selected ? dlg.button_label_active.atr
+	(void)wattrset(win, selected ? dlg.button_label_active.atr
 		 : dlg.button_label_inactive.atr);
 	for (i = 0; i < temp; i++)
 		waddch(win, ' ');
-	wattrset(win, selected ? dlg.button_key_active.atr
+	(void)wattrset(win, selected ? dlg.button_key_active.atr
 		 : dlg.button_key_inactive.atr);
 	waddch(win, label[0]);
-	wattrset(win, selected ? dlg.button_label_active.atr
+	(void)wattrset(win, selected ? dlg.button_label_active.atr
 		 : dlg.button_label_inactive.atr);
 	waddstr(win, (char *)label + 1);
-	wattrset(win, selected ? dlg.button_active.atr
+	(void)wattrset(win, selected ? dlg.button_active.atr
 		 : dlg.button_inactive.atr);
 	waddstr(win, ">");
 	wmove(win, y, x + temp + 1);
@@ -423,7 +423,7 @@ draw_box(WINDOW * win, int y, int x, int height, int width,
 {
 	int i, j;
 
-	wattrset(win, 0);
+	(void)wattrset(win, 0);
 	for (i = 0; i < height; i++) {
 		wmove(win, y + i, x);
 		for (j = 0; j < width; j++)
@@ -457,7 +457,7 @@ void draw_shadow(WINDOW * win, int y, int x, int height, int width)
 	int i;
 
 	if (has_colors()) {	/* Whether terminal supports color? */
-		wattrset(win, dlg.shadow.atr);
+		(void)wattrset(win, dlg.shadow.atr);
 		wmove(win, y + height, x + 2);
 		for (i = 0; i < width; i++)
 			waddch(win, winch(win) & A_CHARTEXT);

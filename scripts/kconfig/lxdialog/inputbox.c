@@ -71,16 +71,16 @@ do_resize:
 
 	draw_box(dialog, 0, 0, height, width,
 		 dlg.dialog.atr, dlg.border.atr);
-	wattrset(dialog, dlg.border.atr);
+	(void)wattrset(dialog, dlg.border.atr);
 	mvwaddch(dialog, height - 3, 0, ACS_LTEE);
 	for (i = 0; i < width - 2; i++)
 		waddch(dialog, ACS_HLINE);
-	wattrset(dialog, dlg.dialog.atr);
+	(void)wattrset(dialog, dlg.dialog.atr);
 	waddch(dialog, ACS_RTEE);
 
 	print_title(dialog, title, width);
 
-	wattrset(dialog, dlg.dialog.atr);
+	(void)wattrset(dialog, dlg.dialog.atr);
 	print_autowrap(dialog, prompt, width - 2, 1, 3);
 
 	/* Draw the input field box */
@@ -95,7 +95,7 @@ do_resize:
 
 	/* Set up the initial value */
 	wmove(dialog, box_y, box_x);
-	wattrset(dialog, dlg.inputbox.atr);
+	(void)wattrset(dialog, dlg.inputbox.atr);
 
 	input_x = strlen(instr);
 
@@ -128,7 +128,7 @@ do_resize:
 			case KEY_BACKSPACE:
 			case 127:
 				if (input_x || scroll) {
-					wattrset(dialog, dlg.inputbox.atr);
+					(void)wattrset(dialog, dlg.inputbox.atr);
 					if (!input_x) {
 						scroll = scroll < box_width - 1 ? 0 : scroll - (box_width - 1);
 						wmove(dialog, box_y, box_x);
@@ -148,7 +148,7 @@ do_resize:
 			default:
 				if (key < 0x100 && isprint(key)) {
 					if (scroll + input_x < MAX_LEN) {
-						wattrset(dialog, dlg.inputbox.atr);
+						(void)wattrset(dialog, dlg.inputbox.atr);
 						instr[scroll + input_x] = key;
 						instr[scroll + input_x + 1] = '\0';
 						if (input_x == box_width - 1) {

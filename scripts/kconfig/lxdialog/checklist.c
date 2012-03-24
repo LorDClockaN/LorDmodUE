@@ -33,20 +33,20 @@ static void print_item(WINDOW * win, int choice, int selected)
 	int i;
 
 	/* Clear 'residue' of last item */
-	wattrset(win, dlg.menubox.atr);
+	(void)wattrset(win, dlg.menubox.atr);
 	wmove(win, choice, 0);
 	for (i = 0; i < list_width; i++)
 		waddch(win, ' ');
 
 	wmove(win, choice, check_x);
-	wattrset(win, selected ? dlg.check_selected.atr
+	(void)wattrset(win, selected ? dlg.check_selected.atr
 		 : dlg.check.atr);
 	if (!item_is_tag(':'))
 		wprintw(win, "(%c)", item_is_tag('X') ? 'X' : ' ');
 
-	wattrset(win, selected ? dlg.tag_selected.atr : dlg.tag.atr);
+	(void)wattrset(win, selected ? dlg.tag_selected.atr : dlg.tag.atr);
 	mvwaddch(win, choice, item_x, item_str()[0]);
-	wattrset(win, selected ? dlg.item_selected.atr : dlg.item.atr);
+	(void)wattrset(win, selected ? dlg.item_selected.atr : dlg.item.atr);
 	waddstr(win, (char *)item_str() + 1);
 	if (selected) {
 		wmove(win, choice, check_x + 1);
@@ -63,11 +63,11 @@ static void print_arrows(WINDOW * win, int choice, int item_no, int scroll,
 	wmove(win, y, x);
 
 	if (scroll > 0) {
-		wattrset(win, dlg.uarrow.atr);
+		(void)wattrset(win, dlg.uarrow.atr);
 		waddch(win, ACS_UARROW);
 		waddstr(win, "(-)");
 	} else {
-		wattrset(win, dlg.menubox.atr);
+		(void)wattrset(win, dlg.menubox.atr);
 		waddch(win, ACS_HLINE);
 		waddch(win, ACS_HLINE);
 		waddch(win, ACS_HLINE);
@@ -78,11 +78,11 @@ static void print_arrows(WINDOW * win, int choice, int item_no, int scroll,
 	wmove(win, y, x);
 
 	if ((height < item_no) && (scroll + choice < item_no - 1)) {
-		wattrset(win, dlg.darrow.atr);
+		(void)wattrset(win, dlg.darrow.atr);
 		waddch(win, ACS_DARROW);
 		waddstr(win, "(+)");
 	} else {
-		wattrset(win, dlg.menubox_border.atr);
+		(void)wattrset(win, dlg.menubox_border.atr);
 		waddch(win, ACS_HLINE);
 		waddch(win, ACS_HLINE);
 		waddch(win, ACS_HLINE);
@@ -145,16 +145,16 @@ do_resize:
 
 	draw_box(dialog, 0, 0, height, width,
 		 dlg.dialog.atr, dlg.border.atr);
-	wattrset(dialog, dlg.border.atr);
+	(void)wattrset(dialog, dlg.border.atr);
 	mvwaddch(dialog, height - 3, 0, ACS_LTEE);
 	for (i = 0; i < width - 2; i++)
 		waddch(dialog, ACS_HLINE);
-	wattrset(dialog, dlg.dialog.atr);
+	(void)wattrset(dialog, dlg.dialog.atr);
 	waddch(dialog, ACS_RTEE);
 
 	print_title(dialog, title, width);
 
-	wattrset(dialog, dlg.dialog.atr);
+	(void)wattrset(dialog, dlg.dialog.atr);
 	print_autowrap(dialog, prompt, width - 2, 1, 3);
 
 	list_width = width - 6;

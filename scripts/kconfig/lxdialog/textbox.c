@@ -95,7 +95,7 @@ do_resize:
 	boxh = height - 4;
 	boxw = width - 2;
 	box = subwin(dialog, boxh, boxw, y + 1, x + 1);
-	wattrset(box, dlg.dialog.atr);
+	(void)wattrset(box, dlg.dialog.atr);
 	wbkgdset(box, dlg.dialog.atr & A_COLOR);
 
 	keypad(box, TRUE);
@@ -104,11 +104,11 @@ do_resize:
 	draw_box(dialog, 0, 0, height, width,
 		 dlg.dialog.atr, dlg.border.atr);
 
-	wattrset(dialog, dlg.border.atr);
+	(void)wattrset(dialog, dlg.border.atr);
 	mvwaddch(dialog, height - 3, 0, ACS_LTEE);
 	for (i = 0; i < width - 2; i++)
 		waddch(dialog, ACS_HLINE);
-	wattrset(dialog, dlg.dialog.atr);
+	(void)wattrset(dialog, dlg.dialog.atr);
 	wbkgdset(dialog, dlg.dialog.atr & A_COLOR);
 	waddch(dialog, ACS_RTEE);
 
@@ -383,7 +383,7 @@ static void print_position(WINDOW * win)
 {
 	int percent;
 
-	wattrset(win, dlg.position_indicator.atr);
+	(void)wattrset(win, dlg.position_indicator.atr);
 	wbkgdset(win, dlg.position_indicator.atr & A_COLOR);
 	percent = (page - buf) * 100 / strlen(buf);
 	wmove(win, getmaxy(win) - 3, getmaxx(win) - 9);
