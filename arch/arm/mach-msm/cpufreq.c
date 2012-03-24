@@ -120,6 +120,11 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 		goto done;
 	}
 
+	if (policy->cur == table[index].frequency) {
+		ret = 0;
+		goto done;
+	}
+
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	dprintk("CPU[%d] target %d relation %d (%d-%d) selected %d\n",
 		policy->cpu, target_freq, relation,
