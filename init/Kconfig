@@ -36,6 +36,35 @@ config SCHED_BFS
           Say Y here.
 	default y
 
+config SCHED_BFS_CUSTOM_RR
+	bool "Custom rr_interval for BFS"
+	depends on SCHED_BFS
+	default n
+	help
+	  Selecting this option will allow you to change the default value
+	  for rr_interval within the bfs scheduler.
+
+	  The default rr_interval is 6ms
+	  If unsure, say N.
+
+config SCHED_BFS_RR_INTERVAL
+	int "rr_interval value in ms"
+	depends on SCHED_BFS_CUSTOM_RR
+	range 1 5000
+	default 6
+	help
+	  This is the smallest duration that any cpu process scheduling unit
+	  will run for. Increasing this value can increase throughput of cpu
+	  bound tasks substantially but at the expense of increased latencies
+	  overall. Conversely decreasing it will decrease average and maximum
+	  latencies but at the expense of throughput. This value is in
+	  milliseconds and the default value chosen depends on the number of
+	  cpus available at scheduler initialisation with a minimum of 6.
+
+	  Valid values are from 1-5000.
+	  Default is 6ms
+	  3ms is recommended for a very interactive, responsive desktop
+
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
 	---help---

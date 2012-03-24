@@ -127,7 +127,12 @@
  * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
  * Tunable via /proc interface.
  */
+
+#ifdef CONFIG_SCHED_BFS_CUSTOM_RR
+int rr_interval __read_mostly = CONFIG_SCHED_BFS_RR_INTERVAL;
+#else
 int rr_interval __read_mostly = 2;
+#endif
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
