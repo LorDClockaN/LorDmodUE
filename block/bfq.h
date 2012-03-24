@@ -1,5 +1,5 @@
 /*
- * BFQ-v2 for 2.6.37: data structures and common functions prototypes.
+ * BFQ-v3r1 for 2.6.38: data structures and common functions prototypes.
  *
  * Based on ideas and code from CFQ:
  * Copyright (C) 2003 Jens Axboe <axboe@kernel.dk>
@@ -26,9 +26,6 @@
 #define BFQ_DEFAULT_GRP_IOPRIO	0
 #define BFQ_DEFAULT_GRP_CLASS	IOPRIO_CLASS_BE
 
-typedef u64 bfq_timestamp_t;
-typedef unsigned long bfq_service_t;
-
 struct bfq_entity;
 
 /**
@@ -52,7 +49,7 @@ struct bfq_service_tree {
 	struct bfq_entity *first_idle;
 	struct bfq_entity *last_idle;
 
-	bfq_timestamp_t vtime;
+	u64 vtime;
 	unsigned long wsum;
 };
 
@@ -137,14 +134,14 @@ struct bfq_entity {
 
 	int on_st;
 
-	bfq_timestamp_t finish;
-	bfq_timestamp_t start;
+	u64 finish;
+	u64 start;
 
 	struct rb_root *tree;
 
-	bfq_timestamp_t min_start;
+	u64 min_start;
 
-	bfq_service_t service, budget;
+	unsigned long service, budget;
 	unsigned short weight, new_weight;
 	unsigned short orig_weight;
 
@@ -162,9 +159,92 @@ struct bfq_entity {
 struct bfq_group;
 
 /**
+ * struct bfq_queue - leaf schedulable entity.
+ * @ref: reference counter.
+ * @bfqd: parent bfq_data.
+ * @new_bfqq: shared bfq_queue if queue is cooperating with
+ *           one or more other queues.
+ * @pos_node: request-position tree member (see bfq_data's @rq_pos_tree).
+ * @pos_root: request-position tree root (see bfq_data's @rq_pos_tree).
+ * @sort_list: sorted list of pending requests.
+ * @next_rq: if fifo isn't expired, next request to serve.
+ * @queued: nr of requests queued in @sort_list.
+ * @allocated: currently allocated requests.
+ * @meta_pending: pending metadata requests.
+ * @fifo: fifo list of requests in sort_list.
+ * @entity: entity representing this queue in the scheduler.
+ * @max_budget: maximum budget allowed from the feedback mechanism.
+ * @budget_timeout: budget expiration (in jiffies).
+ * @dispatched: number of requests on the dispatch list or inside driver.
+ * @org_ioprio: saved ioprio during boosted periods.
+ * @org_ioprio_class: saved ioprio_class during boosted periods.
+ * @flags: status flags.
+ * @bfqq_list: node for active/idle bfqq list inside our bfqd.
+ * @seek_samples: number of seeks sampled
+ * @seek_total: sum of the distances of the seeks sampled
+ * @seek_mean: mean seek distance
+ * @last_request_pos: position of the last request enqueued
+ * @pid: pid of the process owning the queue, used for logging purposes.
+ * @last_rais_start_time: last (idle -> weight-raised) transition attempt
+ * @raising_cur_max_time: current max raising time for this queue
+ *
+ * A bfq_queue is a leaf request queue; it can be associated to an io_context
+ * or more (if it is an async one).  @cgroup holds a reference to the
+ * cgroup, to be sure that it does not disappear while a bfqq still
+ * references it (mostly to avoid races between request issuing and task
+ * migration followed by cgroup distruction).
+ * All the fields are protected by the queue lock of the containing bfqd.
+ */
+struct bfq_queue {
+	atomic_t ref;
+	struct bfq_data *bfqd;
+
+	/* fields for cooperating queues handling */
+	struct bfq_queue *new_bfqq;
+	struct rb_node pos_node;
+	struct rb_root *pos_root;
+
+	struct rb_root sort_list;
+	struct request *next_rq;
+	int queued[2];
+	int allocated[2];
+	int meta_pending;
+	struct list_head fifo;
+
+	struct bfq_entity entity;
+
+	unsigned long max_budget;
+	unsigned long budget_timeout;
+
+	int dispatched;
+
+	unsigned short org_ioprio;
+	unsigned short org_ioprio_class;
+
+	unsigned int flags;
+
+	struct list_head bfqq_list;
+
+	unsigned int seek_samples;
+	u64 seek_total;
+	sector_t seek_mean;
+	sector_t last_request_pos;
+
+	pid_t pid;
+
+	/* weight-raising fields */
+	unsigned int raising_cur_max_time;
+	u64 last_rais_start_finish, soft_rt_next_start;
+	unsigned int raising_coeff;
+};
+
+/**
  * struct bfq_data - per device data structure.
  * @queue: request queue for the managed device.
  * @root_group: root bfq_group for the device.
+ * @rq_pos_tree: rbtree sorted by next_request position,
+ *		used when determining if two or more queues
+ *		have interleaving requests (see bfq_close_cooperator).
  * @busy_queues: number of bfq_queues containing requests (including the
  *		 queue under service, even if it is idling).
  * @queued: number of queued requests.
@@ -210,10 +290,12 @@ struct bfq_group;
  * @bfq_raising_coeff: Maximum factor by which the weight of a boosted
  *                            queue is multiplied
  * @bfq_raising_max_time: maximum duration of a weight-raising period (jiffies)
+ * @bfq_raising_rt_max_time: maximum duration for soft real-time processes
  * @bfq_raising_min_idle_time: minimum idle period after which weight-raising
  *			       may be reactivated for a queue (in jiffies)
  * @bfq_raising_max_softrt_rate: max service-rate for a soft real-time queue,
  *			         sectors per seconds
+ * @oom_bfqq: fallback dummy bfqq for extreme OOM conditions
  *
  * All the fields are protected by the @queue lock.
  */
@@ -221,6 +303,8 @@ struct bfq_data {
 	struct request_queue *queue;
 
 	struct bfq_group *root_group;
+
+	struct rb_root rq_pos_tree;
 
 	int busy_queues;
 	int queued;
@@ -245,7 +329,7 @@ struct bfq_data {
 	ktime_t last_idling_start;
 	int peak_rate_samples;
 	u64 peak_rate;
-	bfq_service_t bfq_max_budget;
+	unsigned long bfq_max_budget;
 
 	unsigned int cic_index;
 	struct list_head cic_list;
@@ -269,78 +353,11 @@ struct bfq_data {
 	/* parameters of the low_latency heuristics */
 	unsigned int bfq_raising_coeff;
 	unsigned int bfq_raising_max_time;
+	unsigned int bfq_raising_rt_max_time;
 	unsigned int bfq_raising_min_idle_time;
 	unsigned int bfq_raising_max_softrt_rate;
-};
 
-/**
- * struct bfq_queue - leaf schedulable entity.
- * @ref: reference counter.
- * @bfqd: parent bfq_data.
- * @sort_list: sorted list of pending requests.
- * @next_rq: if fifo isn't expired, next request to serve.
- * @queued: nr of requests queued in @sort_list.
- * @allocated: currently allocated requests.
- * @meta_pending: pending metadata requests.
- * @fifo: fifo list of requests in sort_list.
- * @entity: entity representing this queue in the scheduler.
- * @max_budget: maximum budget allowed from the feedback mechanism.
- * @budget_timeout: budget expiration (in jiffies).
- * @dispatched: number of requests on the dispatch list or inside driver.
- * @org_ioprio: saved ioprio during boosted periods.
- * @org_ioprio_class: saved ioprio_class during boosted periods.
- * @flags: status flags.
- * @bfqq_list: node for active/idle bfqq list inside our bfqd.
- * @seek_samples: number of seeks sampled
- * @seek_total: sum of the distances of the seeks sampled
- * @seek_mean: mean seek distance
- * @last_request_pos: position of the last request enqueued
- * @pid: pid of the process owning the queue, used for logging purposes.
- * @last_rais_start_time: last (idle -> weight-raised) transition attempt
- * @high_weight_budget: number of sectors left to serve with boosted weight
- *
- * A bfq_queue is a leaf request queue; it can be associated to an io_context
- * or more (if it is an async one).  @cgroup holds a reference to the
- * cgroup, to be sure that it does not disappear while a bfqq still
- * references it (mostly to avoid races between request issuing and task
- * migration followed by cgroup distruction).
- * All the fields are protected by the queue lock of the containing bfqd.
- */
-struct bfq_queue {
-	atomic_t ref;
-	struct bfq_data *bfqd;
-
-	struct rb_root sort_list;
-	struct request *next_rq;
-	int queued[2];
-	int allocated[2];
-	int meta_pending;
-	struct list_head fifo;
-
-	struct bfq_entity entity;
-
-	bfq_service_t max_budget;
-	unsigned long budget_timeout;
-
-	int dispatched;
-
-	unsigned short org_ioprio;
-	unsigned short org_ioprio_class;
-
-	unsigned int flags;
-
-	struct list_head bfqq_list;
-
-	unsigned int seek_samples;
-	u64 seek_total;
-	sector_t seek_mean;
-	sector_t last_request_pos;
-
-	pid_t pid;
-
-	/* weight-raising fileds */
- 	u64 last_rais_start_finish, soft_rt_next_start;
- 	unsigned int raising_coeff;
+	struct bfq_queue oom_bfqq;
 };
 
 enum bfqq_state_flags {
@@ -352,6 +369,9 @@ enum bfqq_state_flags {
 	BFQ_BFQQ_FLAG_prio_changed,	/* task priority has changed */
 	BFQ_BFQQ_FLAG_sync,		/* synchronous queue */
 	BFQ_BFQQ_FLAG_budget_new,	/* no completion with this budget */
+	BFQ_BFQQ_FLAG_coop,		/* bfqq is shared */
+	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be splitted */
+	BFQ_BFQQ_FLAG_some_coop_idle,   /* some cooperator is inactive */
 };
 
 #define BFQ_BFQQ_FNS(name)						\
@@ -376,6 +396,9 @@ BFQ_BFQQ_FNS(idle_window);
 BFQ_BFQQ_FNS(prio_changed);
 BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(budget_new);
+BFQ_BFQQ_FNS(coop);
+BFQ_BFQQ_FNS(split_coop);
+BFQ_BFQQ_FNS(some_coop_idle);
 #undef BFQ_BFQQ_FNS
 
 /* Logging facilities. */
@@ -533,7 +556,7 @@ static inline struct bfq_data *bfq_get_bfqd_locked(void **ptr,
 	rcu_read_lock();
 	bfqd = rcu_dereference(*(struct bfq_data **)ptr);
 
-	if (bfqd != NULL && ! ((unsigned long) bfqd & CIC_DEAD_KEY)) {
+	if (bfqd != NULL && !((unsigned long) bfqd & CIC_DEAD_KEY)) {
 		spin_lock_irqsave(bfqd->queue->queue_lock, *flags);
 		if (*ptr == bfqd)
 			goto out;

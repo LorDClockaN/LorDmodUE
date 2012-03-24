@@ -93,6 +93,8 @@ enum rq_flag_bits {
 	__REQ_FAILFAST_TRANSPORT, /* no driver retries of transport errors */
 	__REQ_FAILFAST_DRIVER,	/* no driver retries of driver errors */
 	/* above flags must match BIO_RW_* */
+	__REQ_SYNC,    /* request is sync (sync write or read) */
+	__REQ_META,    /* metadata io request */
 	__REQ_DISCARD,		/* request to discard sectors */
 	__REQ_SORTED,		/* elevator knows about this request */
 	__REQ_SOFTBARRIER,	/* may not be passed by ioscheduler */
@@ -122,6 +124,8 @@ enum rq_flag_bits {
 #define REQ_FAILFAST_DEV	(1 << __REQ_FAILFAST_DEV)
 #define REQ_FAILFAST_TRANSPORT	(1 << __REQ_FAILFAST_TRANSPORT)
 #define REQ_FAILFAST_DRIVER	(1 << __REQ_FAILFAST_DRIVER)
+#define REQ_SYNC    	(1 << __REQ_SYNC)
+#define REQ_META    	(1 << __REQ_META)
 #define REQ_DISCARD	(1 << __REQ_DISCARD)
 #define REQ_SORTED	(1 << __REQ_SORTED)
 #define REQ_SOFTBARRIER	(1 << __REQ_SOFTBARRIER)
@@ -656,9 +660,6 @@ static inline bool rq_is_sync(struct request *rq)
 
 #define rq_is_meta(rq)		((rq)->cmd_flags & REQ_RW_META)
 #define rq_noidle(rq)		((rq)->cmd_flags & REQ_NOIDLE)
-
-#define rq_is_meta(rq)          ((rq)->cmd_flags & REQ_RW_META)
-#define rq_noidle(rq)           ((rq)->cmd_flags & REQ_NOIDLE)
 
 static inline int blk_queue_full(struct request_queue *q, int sync)
 {

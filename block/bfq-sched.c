@@ -86,7 +86,7 @@ static inline void bfq_check_next_active(struct bfq_sched_data *sd,
  *
  * Return @a > @b, dealing with wrapping correctly.
  */
-static inline int bfq_gt(bfq_timestamp_t a, bfq_timestamp_t b)
+static inline int bfq_gt(u64 a, u64 b)
 {
 	return (s64)(a - b) > 0;
 }
@@ -109,10 +109,10 @@ static inline struct bfq_queue *bfq_entity_to_bfqq(struct bfq_entity *entity)
  * @service: amount of service.
  * @weight: scale factor (weight of an entity or weight sum).
  */
-static inline bfq_timestamp_t bfq_delta(bfq_service_t service,
+static inline u64 bfq_delta(unsigned long service,
 					unsigned long weight)
 {
-	bfq_timestamp_t d = (bfq_timestamp_t)service << WFQ_SERVICE_SHIFT;
+	u64 d = (u64)service << WFQ_SERVICE_SHIFT;
 
 	do_div(d, weight);
 	return d;
@@ -124,7 +124,7 @@ static inline bfq_timestamp_t bfq_delta(bfq_service_t service,
  * @service: the service to be charged to the entity.
  */
 static inline void bfq_calc_finish(struct bfq_entity *entity,
-				   bfq_service_t service)
+				   unsigned long service)
 {
 	struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
 
@@ -566,7 +566,7 @@ __bfq_entity_update_weight_prio(struct bfq_service_tree *old_st,
  * are synchronized every time a new bfqq is selected for service.  By now,
  * we keep it to better check consistency.
  */
-static void bfq_bfqq_served(struct bfq_queue *bfqq, bfq_service_t served)
+static void bfq_bfqq_served(struct bfq_queue *bfqq, unsigned long served)
 {
 	struct bfq_entity *entity = &bfqq->entity;
 	struct bfq_service_tree *st;
@@ -942,6 +942,33 @@ static struct bfq_queue *bfq_get_next_queue(struct bfq_data *bfqd)
 	BUG_ON(bfqq == NULL);
 
 	return bfqq;
+}
+
+/*
+ * Forced extraction of the given queue.
+ */
+static void bfq_get_next_queue_forced(struct bfq_data *bfqd,
+				      struct bfq_queue *bfqq)
+{
+	struct bfq_entity *entity;
+	struct bfq_sched_data *sd;
+
+	BUG_ON(bfqd->active_queue != NULL);
+
+	entity = &bfqq->entity;
+	/*
+	 * Bubble up extraction/update from the leaf to the root.
+	*/
+	for_each_entity(entity) {
+		sd = entity->sched_data;
+		bfq_update_vtime(bfq_entity_service_tree(entity));
+		bfq_active_extract(bfq_entity_service_tree(entity), entity);
+		sd->active_entity = entity;
+		sd->next_active = NULL;
+		entity->service = 0;
+	}
+
+	return;
 }
 
 static void __bfq_bfqd_reset_active(struct bfq_data *bfqd)
