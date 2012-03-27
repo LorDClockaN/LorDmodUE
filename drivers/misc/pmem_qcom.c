@@ -50,7 +50,7 @@
 #ifdef CONFIG_ANDROID_PMEM_DEBUG
 #define PMEM_DEBUG 1
 #else
-#define PMEM_DEBUG 1
+#define PMEM_DEBUG 0
 #endif
 
 #define SYSTEM_ALLOC_RETRY 10
