@@ -397,8 +397,12 @@ void kgsl_pwrctrl_pwrrail(struct kgsl_device *device, int state)
 			&pwr->power_flags)) {
 			internal_pwr_rail_ctl(pwr->pwr_rail, 1);
 			trace_kgsl_rail(device, state);
-			if (pwr->gpu_reg)
-				regulator_enable(pwr->gpu_reg);
+			if (pwr->gpu_reg) {
+				int status = regulator_enable(pwr->gpu_reg);
+				if (status)
+					KGSL_DRV_ERR(device, "regulator_enable "
+							"failed: %d\n", status);
+			}
 		}
 	}
 }
