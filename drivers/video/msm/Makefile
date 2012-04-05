@@ -12,7 +12,6 @@ obj-y += mdp.o
 obj-$(CONFIG_FB_MSM_OVERLAY) += mdp4_util.o
 obj-$(CONFIG_FB_MSM_OVERLAY) += mdp4_overlay.o
 obj-$(CONFIG_FB_MSM_OVERLAY) += mdp4_overlay_mddi.o
-obj-$(CONFIG_MSM_MDP40) += msm_rotator.o
 
 obj-$(CONFIG_FB_MSM_LEGACY_MDP) += mdp_hw_legacy.o
 
