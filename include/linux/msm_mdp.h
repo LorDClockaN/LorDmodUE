@@ -19,7 +19,6 @@
 #define MSMFB_IOCTL_MAGIC 'm'
 #define MSMFB_GRP_DISP          _IOW(MSMFB_IOCTL_MAGIC, 1, unsigned int)
 #define MSMFB_BLIT              _IOW(MSMFB_IOCTL_MAGIC, 2, unsigned int)
-#ifdef CONFIG_MSM_MDP40
 #define MSMFB_SUSPEND_SW_REFRESHER _IOW(MSMFB_IOCTL_MAGIC, 128, unsigned int)
 #define MSMFB_RESUME_SW_REFRESHER _IOW(MSMFB_IOCTL_MAGIC, 129, unsigned int)
 #define MSMFB_CURSOR _IOW(MSMFB_IOCTL_MAGIC, 130, struct fb_cursor)
@@ -42,14 +41,32 @@
 #define MSMFB_OVERLAY_PLAY_ENABLE     _IOW(MSMFB_IOCTL_MAGIC, 141, unsigned int)
 #define MSMFB_OVERLAY_BLT       _IOWR(MSMFB_IOCTL_MAGIC, 142, \
 						struct msmfb_overlay_blt)
-#define MSMFB_GET_GAMMA_CURVY _IOWR(MSMFB_IOCTL_MAGIC, 143, struct gamma_curvy)
-#define MSMFB_HISTOGRAM_START _IO(MSMFB_IOCTL_MAGIC, 144)
-#define MSMFB_HISTOGRAM_STOP  _IO(MSMFB_IOCTL_MAGIC, 145)
-#define MSMFB_OVERLAY_CHANGE_ZORDER_VG_PIPES	_IOW(MSMFB_IOCTL_MAGIC, 146, unsigned int)
+#define MSMFB_OVERLAY_BLT_OFFSET     _IOW(MSMFB_IOCTL_MAGIC, 143, unsigned int)
+#define MSMFB_HISTOGRAM_START	_IO(MSMFB_IOCTL_MAGIC, 144)
+#define MSMFB_HISTOGRAM_STOP	_IO(MSMFB_IOCTL_MAGIC, 145)
+#define MSMFB_NOTIFY_UPDATE	_IOW(MSMFB_IOCTL_MAGIC, 146, unsigned int)
 #define MSMFB_OVERLAY_3D       _IOWR(MSMFB_IOCTL_MAGIC, 147, \
 						struct msmfb_overlay_3d)
 
-#endif
+#define MSMFB_MIXER_INFO       _IOWR(MSMFB_IOCTL_MAGIC, 148, \
+						struct msmfb_mixer_info_req)
+#define MSMFB_OVERLAY_PLAY_WAIT _IOWR(MSMFB_IOCTL_MAGIC, 149, \
+						struct msmfb_overlay_data)
+
+#define MSMFB_WRITEBACK_INIT _IO(MSMFB_IOCTL_MAGIC, 150)
+#define MSMFB_WRITEBACK_REGISTER_BUFFER _IOW(MSMFB_IOCTL_MAGIC, 151, \
+						struct msmfb_writeback_data)
+#define MSMFB_WRITEBACK_UNREGISTER_BUFFER _IOW(MSMFB_IOCTL_MAGIC, 152, \
+						struct msmfb_writeback_data)
+#define MSMFB_WRITEBACK_QUEUE_BUFFER _IOW(MSMFB_IOCTL_MAGIC, 153, \
+						struct msmfb_data)
+#define MSMFB_WRITEBACK_DEQUEUE_BUFFER _IOW(MSMFB_IOCTL_MAGIC, 154, \
+						struct msmfb_data)
+#define MSMFB_WRITEBACK_TERMINATE _IO(MSMFB_IOCTL_MAGIC, 155)
+
+#define FB_TYPE_3D_PANEL 0x10101010
+#define MDP_IMGTYPE2_START 0x10000
+#define MSMFB_DRIVER_VERSION	0xF9E8D701
 
 enum {
 	MDP_RGB_565,      // RGB 565 planer
@@ -69,9 +86,11 @@ enum {
 	MDP_Y_CBCR_H2V2_TILE,  /* Y and CbCr, pseudo planer tile */
 #endif
 	MDP_Y_CR_CB_H2V2,  /* Y, Cr and Cb, planar */
+	MDP_Y_CR_CB_GH2V2,  /* Y, Cr and Cb, planar aligned to Android YV12 */
 	MDP_Y_CB_CR_H2V2,  /* Y, Cb and Cr, planar */
+	MDP_Y_CRCB_H1V1,  /* Y and CrCb, pseduo planer w/ Cr is in MSB */
+	MDP_Y_CBCR_H1V1,  /* Y and CbCr, pseduo planer w/ Cb is in MSB */
 	MDP_IMGTYPE_LIMIT, // Non valid image type after this enum
-	MDP_IMGTYPE2_START = 0x10000,
 	MDP_BGR_565 = MDP_IMGTYPE2_START,      /* BGR 565 planer */
 	MDP_FB_FORMAT,    /* framebuffer format */
 	MDP_IMGTYPE_LIMIT2 /* Non valid image type after this enum */

@@ -865,6 +865,12 @@ static int msmfb_overlay_change_z_order_vg_pipes(struct fb_info *info, unsigned 
 
 	return ret;
 }
+
+static int msmfb_notify_update(struct fb_info *info, unsigned long *argp)
+{
+	PR_DISP_ERR("%s: this ioctl not implemented yet\n", __func__);
+	return 0;
+}
 #endif
 
 #if defined (CONFIG_FB_MSM_MDP_ABL)
@@ -1023,12 +1029,17 @@ static int msmfb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 		} else
 			ret = msmfb_overlay_play(p, argp);
 		break;
+#if 0
 	case MSMFB_OVERLAY_CHANGE_ZORDER_VG_PIPES:
 		if(!atomic_read(&mdpclk_on)) {
 			PR_DISP_ERR("MSMFB_OVERLAY_CHANGE_ZORDER_VG_PIPES during suspend\n");
 			ret = -EINVAL;
 		} else
 			ret = msmfb_overlay_change_z_order_vg_pipes(p, argp);
+		break;
+#endif
+	case MSMFB_NOTIFY_UPDATE:
+		ret = msmfb_notify_update(p, argp);
 		break;
 #endif
 #if defined (CONFIG_FB_MSM_MDP_ABL)
