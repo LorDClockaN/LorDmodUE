@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 #include <linux/platform_device.h>
 #include <linux/cdev.h>
@@ -24,23 +19,25 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/clk.h>
-#include <mach/clk.h>
 #include <linux/android_pmem.h>
 #include <linux/msm_rotator.h>
 #include <linux/io.h>
 #include <mach/msm_rotator_imem.h>
 #include <linux/ktime.h>
 #include <linux/workqueue.h>
-#include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/major.h>
 #include <linux/fb.h>
 #include <linux/regulator/consumer.h>
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 #include <linux/ion.h>
-#else
+#else /* FIXME */
 struct ion_handle {
 };
+#endif
+#ifdef CONFIG_MSM_BUS_SCALING
+#include <mach/msm_bus.h>
+#include <mach/msm_bus_board.h>
 #endif
 
 #define DRIVER_NAME "msm_rotator"
@@ -97,6 +94,20 @@ struct ion_handle {
 #define VERSION_KEY_MASK 0xFFFFFF00
 #define MAX_DOWNSCALE_RATIO 3
 
+#define ROTATOR_REVISION_V0		0
+#define ROTATOR_REVISION_V1		1
+#define ROTATOR_REVISION_V2		2
+#define ROTATOR_REVISION_NONE	0xffffffff
+
+uint32_t rotator_hw_revision;
+
+/*
+ * rotator_hw_revision:
+ * 0 == 7x30
+ * 1 == 8x60
+ * 2 == 8960
+ *
+ */
 struct tile_parm {
 	unsigned int width;  /* tile's width */
 	unsigned int height; /* tile's height */
@@ -120,7 +131,6 @@ struct msm_rotator_dev {
 	struct clk *core_clk;
 	int pid_list[MAX_SESSIONS];
 	struct clk *pclk;
-	struct clk *axi_clk;
 	int rot_clk_state;
 	struct regulator *regulator;
 	struct delayed_work rot_clk_work;
@@ -138,9 +148,10 @@ struct msm_rotator_dev {
 	struct mutex imem_lock;
 	int imem_owner;
 	wait_queue_head_t wq;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	struct ion_client *client;
-#endif
+	#ifdef CONFIG_MSM_BUS_SCALING
+	uint32_t bus_client_handle;
+	#endif
 };
 
 #define COMPONENT_5BITS 1
@@ -225,19 +236,23 @@ static void msm_rotator_imem_clk_work_f(struct work_struct *work)
 /* enable clocks needed by rotator block */
 static void enable_rot_clks(void)
 {
-	clk_enable(msm_rotator_dev->pclk);
-	clk_enable(msm_rotator_dev->axi_clk);
 	if (msm_rotator_dev->regulator)
 		regulator_enable(msm_rotator_dev->regulator);
+	if (msm_rotator_dev->core_clk != NULL)
+		clk_enable(msm_rotator_dev->core_clk);
+	if (msm_rotator_dev->pclk != NULL)
+		clk_enable(msm_rotator_dev->pclk);
 }
 
 /* disable clocks needed by rotator block */
 static void disable_rot_clks(void)
 {
+	if (msm_rotator_dev->core_clk != NULL)
+		clk_disable(msm_rotator_dev->core_clk);
+	if (msm_rotator_dev->pclk != NULL)
+		clk_disable(msm_rotator_dev->pclk);
 	if (msm_rotator_dev->regulator)
 		regulator_disable(msm_rotator_dev->regulator);
-	clk_disable(msm_rotator_dev->pclk);
-	clk_disable(msm_rotator_dev->axi_clk);
 }
 
 static void msm_rotator_rot_clk_work_f(struct work_struct *work)
@@ -294,6 +309,7 @@ static int get_bpp(int format)
 	case MDP_Y_CRCB_H2V2:
 	case MDP_Y_CB_CR_H2V2:
 	case MDP_Y_CR_CB_H2V2:
+	case MDP_Y_CR_CB_GH2V2:
 	case MDP_Y_CRCB_H2V2_TILE:
 	case MDP_Y_CBCR_H2V2_TILE:
 		return 1;
@@ -372,6 +388,12 @@ static int msm_rotator_get_plane_sizes(uint32_t format,	uint32_t w, uint32_t h,
 		p->plane_size[0] = w * h;
 		p->plane_size[1] = (w / 2) * (h / 2);
 		p->plane_size[2] = (w / 2) * (h / 2);
+		break;
+	case MDP_Y_CR_CB_GH2V2:
+		p->num_planes = 3;
+		p->plane_size[0] = ALIGN(w, 16) * h;
+		p->plane_size[1] = ALIGN(w / 2, 16) * (h / 2);
+		p->plane_size[2] = ALIGN(w / 2, 16) * (h / 2);
 		break;
 	default:
 		return -EINVAL;
@@ -472,6 +494,7 @@ static int msm_rotator_ycxcx_h2v2(struct msm_rotator_img_info *info,
 	case MDP_Y_CRCB_H2V2_TILE:
 		is_tile = 1;
 	case MDP_Y_CR_CB_H2V2:
+	case MDP_Y_CR_CB_GH2V2:
 	case MDP_Y_CRCB_H2V2:
 		dst_format = MDP_Y_CRCB_H2V2;
 		break;
@@ -488,7 +511,9 @@ static int msm_rotator_ycxcx_h2v2(struct msm_rotator_img_info *info,
 		return -EINVAL;
 
 	/* rotator expects YCbCr for planar input format */
-	if (info->src.format == MDP_Y_CR_CB_H2V2)
+	if ((info->src.format == MDP_Y_CR_CB_H2V2 ||
+	    info->src.format == MDP_Y_CR_CB_GH2V2) &&
+	    rotator_hw_revision < ROTATOR_REVISION_V2)
 		swap(in_chroma_paddr, in_chroma2_paddr);
 
 	iowrite32(in_paddr, MSM_ROTATOR_SRCP0_ADDR);
@@ -504,11 +529,19 @@ static int msm_rotator_ycxcx_h2v2(struct msm_rotator_img_info *info,
 
 	if (new_session) {
 		if (in_chroma2_paddr) {
-            iowrite32(info->src.width |
-                (info->src.width / 2) << 16,
-                MSM_ROTATOR_SRC_YSTRIDE1);
-            iowrite32((info->src.width / 2),
-                MSM_ROTATOR_SRC_YSTRIDE2);
+			if (info->src.format == MDP_Y_CR_CB_GH2V2) {
+				iowrite32(ALIGN(info->src.width, 16) |
+					ALIGN((info->src.width / 2), 16) << 16,
+					MSM_ROTATOR_SRC_YSTRIDE1);
+				iowrite32(ALIGN((info->src.width / 2), 16),
+					MSM_ROTATOR_SRC_YSTRIDE2);
+			} else {
+				iowrite32(info->src.width |
+					(info->src.width / 2) << 16,
+					MSM_ROTATOR_SRC_YSTRIDE1);
+				iowrite32((info->src.width / 2),
+					MSM_ROTATOR_SRC_YSTRIDE2);
+			}
 		} else {
 			iowrite32(info->src.width |
 					info->src.width << 16,
@@ -741,7 +774,7 @@ int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num)
 {
 	struct fb_info *info;
 
-	if (fb_num > 32)
+	if (fb_num > FB_MAX)
 		return -1;
 
 	info = registered_fb[fb_num];
@@ -754,7 +787,8 @@ int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num)
 }
 
 static int get_img(struct msmfb_data *fbd, unsigned long *start,
-	unsigned long *len, struct file **p_file, struct ion_handle **p_ihdl)
+	unsigned long *len, struct file **p_file, int *p_need,
+	struct ion_handle **p_ihdl)
 {
 	int ret = 0;
 #ifdef CONFIG_FB
@@ -764,6 +798,8 @@ static int get_img(struct msmfb_data *fbd, unsigned long *start,
 #ifdef CONFIG_ANDROID_PMEM
 	unsigned long vstart;
 #endif
+
+	*p_need = 0;
 
 #ifdef CONFIG_FB
 	if (fbd->flags) {
@@ -775,8 +811,10 @@ static int get_img(struct msmfb_data *fbd, unsigned long *start,
 			fb_num = MINOR(file->f_dentry->d_inode->i_rdev);
 			if (get_fb_phys_info(start, len, fb_num))
 				ret = -1;
-			else
+			else {
 				*p_file = file;
+				*p_need = put_needed;
+			}
 		} else
 			ret = -1;
 		if (ret)
@@ -827,6 +865,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	struct file *srcp1_file = NULL, *dstp1_file = NULL;
 	struct ion_handle *srcp0_ihdl = NULL, *dstp0_ihdl = NULL;
 	struct ion_handle *srcp1_ihdl = NULL, *dstp1_ihdl = NULL;
+	int ps0_need, p_need;
 	unsigned int in_chroma_paddr = 0, out_chroma_paddr = 0;
 	unsigned int in_chroma2_paddr = 0;
 	struct msm_rotator_img_info *img_info;
@@ -877,8 +916,9 @@ static int msm_rotator_do_rotate(unsigned long arg)
 		goto do_rotate_unlock_mutex;
 	}
 
+
 	rc = get_img(&info.src, (unsigned long *)&in_paddr,
-			(unsigned long *)&src_len, &srcp0_file, &srcp0_ihdl);
+		(unsigned long *)&src_len, &srcp0_file, &ps0_need, &srcp0_ihdl);
 	if (rc) {
 		pr_err("%s: in get_img() failed id=0x%08x\n",
 			DRIVER_NAME, info.src.memory_id);
@@ -886,7 +926,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	}
 
 	rc = get_img(&info.dst, (unsigned long *)&out_paddr,
-			(unsigned long *)&dst_len, &dstp0_file, &dstp0_ihdl);
+		(unsigned long *)&dst_len, &dstp0_file, &p_need, &dstp0_ihdl);
 	if (rc) {
 		pr_err("%s: out get_img() failed id=0x%08x\n",
 		       DRIVER_NAME, info.dst.memory_id);
@@ -916,7 +956,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
 
 		rc = get_img(&info.src_chroma,
 				(unsigned long *)&in_chroma_paddr,
-				(unsigned long *)&src_len, &srcp1_file,
+				(unsigned long *)&src_len, &srcp1_file, &p_need,
 				&srcp1_ihdl);
 		if (rc) {
 			pr_err("%s: in chroma get_img() failed id=0x%08x\n",
@@ -926,7 +966,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
 
 		rc = get_img(&info.dst_chroma,
 				(unsigned long *)&out_chroma_paddr,
-				(unsigned long *)&dst_len, &dstp1_file,
+				(unsigned long *)&dst_len, &dstp1_file, &p_need,
 				&dstp1_ihdl);
 		if (rc) {
 			pr_err("%s: out chroma get_img() failed id=0x%08x\n",
@@ -1035,6 +1075,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
 	case MDP_Y_CRCB_H2V2:
 	case MDP_Y_CB_CR_H2V2:
 	case MDP_Y_CR_CB_H2V2:
+	case MDP_Y_CR_CB_GH2V2:
 	case MDP_Y_CRCB_H2V2_TILE:
 	case MDP_Y_CBCR_H2V2_TILE:
 		rc = msm_rotator_ycxcx_h2v2(msm_rotator_dev->img_info[s],
@@ -1093,18 +1134,43 @@ do_rotate_unlock_mutex:
 	put_img(dstp1_file, dstp1_ihdl);
 	put_img(srcp1_file, srcp1_ihdl);
 	put_img(dstp0_file, dstp0_ihdl);
-	put_img(srcp0_file, srcp0_ihdl);
+
+	/* only source may use frame buffer */
+	if (info.src.flags)
+		fput_light(srcp0_file, ps0_need);
+	else
+		put_img(srcp0_file, srcp0_ihdl);
 	mutex_unlock(&msm_rotator_dev->rotator_lock);
 	dev_dbg(msm_rotator_dev->device, "%s() returning rc = %d\n",
 		__func__, rc);
 	return rc;
 }
 
+static void msm_rotator_set_perf_level(u32 wh, u32 is_rgb)
+{
+	u32 perf_level;
+
+	if (is_rgb)
+		perf_level = 1;
+	else if (wh <= (640 * 480))
+		perf_level = 2;
+	else if (wh <= (736 * 1280))
+		perf_level = 3;
+	else
+		perf_level = 4;
+
+#ifdef CONFIG_MSM_BUS_SCALING
+	msm_bus_scale_client_update_request(msm_rotator_dev->bus_client_handle,
+		perf_level);
+#endif
+
+}
+
 static int msm_rotator_start(unsigned long arg, int pid)
 {
 	struct msm_rotator_img_info info;
 	int rc = 0;
-	int s;
+	int s, is_rgb = 0;
 	int first_free_index = INVALID_SESSION;
 	unsigned int dst_w, dst_h;
 
@@ -1146,6 +1212,7 @@ static int msm_rotator_start(unsigned long arg, int pid)
 	case MDP_XRGB_8888:
 	case MDP_RGBX_8888:
 	case MDP_BGRA_8888:
+		is_rgb = 1;
 		info.dst.format = info.src.format;
 		break;
 	case MDP_Y_CBCR_H2V2:
@@ -1162,6 +1229,7 @@ static int msm_rotator_start(unsigned long arg, int pid)
 		info.dst.format = MDP_Y_CBCR_H2V2;
 		break;
 	case MDP_Y_CR_CB_H2V2:
+	case MDP_Y_CR_CB_GH2V2:
 	case MDP_Y_CRCB_H2V2_TILE:
 		info.dst.format = MDP_Y_CRCB_H2V2;
 		break;
@@ -1170,6 +1238,9 @@ static int msm_rotator_start(unsigned long arg, int pid)
 	}
 
 	mutex_lock(&msm_rotator_dev->rotator_lock);
+
+	msm_rotator_set_perf_level((info.src.width*info.src.height), is_rgb);
+
 	for (s = 0; s < MAX_SESSIONS; s++) {
 		if ((msm_rotator_dev->img_info[s] != NULL) &&
 			(info.session_id ==
@@ -1246,6 +1317,10 @@ static int msm_rotator_finish(unsigned long arg)
 
 	if (s == MAX_SESSIONS)
 		rc = -EINVAL;
+#ifdef CONFIG_MSM_BUS_SCALING
+	msm_bus_scale_client_update_request(msm_rotator_dev->bus_client_handle,
+		0);
+#endif
 	mutex_unlock(&msm_rotator_dev->rotator_lock);
 	return rc;
 }
@@ -1358,6 +1433,23 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 			  msm_rotator_imem_clk_work_f);
 	msm_rotator_dev->imem_clk = NULL;
 	msm_rotator_dev->pdev = pdev;
+
+	msm_rotator_dev->core_clk = NULL;
+	msm_rotator_dev->pclk = NULL;
+
+#ifdef CONFIG_MSM_BUS_SCALING
+	if (!msm_rotator_dev->bus_client_handle && pdata &&
+		pdata->bus_scale_table) {
+		msm_rotator_dev->bus_client_handle =
+			msm_bus_scale_register_client(
+				pdata->bus_scale_table);
+		if (!msm_rotator_dev->bus_client_handle) {
+			pr_err("%s not able to get bus scale handle\n",
+				__func__);
+		}
+	}
+#endif
+
 	for (i = 0; i < number_of_clks; i++) {
 		if (pdata->rotator_clks[i].clk_type == ROTATOR_IMEMCLK_CLK) {
 			msm_rotator_dev->imem_clk =
@@ -1371,7 +1463,7 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 				goto error_imem_clk;
 			}
 			if (pdata->rotator_clks[i].clk_rate)
-				clk_set_min_rate(msm_rotator_dev->imem_clk,
+				clk_set_rate(msm_rotator_dev->imem_clk,
 					pdata->rotator_clks[i].clk_rate);
 		}
 		if (pdata->rotator_clks[i].clk_type == ROTATOR_PCLK_CLK) {
@@ -1387,24 +1479,24 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 			}
 
 			if (pdata->rotator_clks[i].clk_rate)
-				clk_set_min_rate(msm_rotator_dev->pclk,
+				clk_set_rate(msm_rotator_dev->pclk,
 					pdata->rotator_clks[i].clk_rate);
 		}
 
 		if (pdata->rotator_clks[i].clk_type == ROTATOR_AXICLK_CLK) {
-			msm_rotator_dev->axi_clk =
+			msm_rotator_dev->core_clk =
 			clk_get(&msm_rotator_dev->pdev->dev,
 				pdata->rotator_clks[i].clk_name);
-			if (IS_ERR(msm_rotator_dev->axi_clk)) {
-				rc = PTR_ERR(msm_rotator_dev->axi_clk);
-				msm_rotator_dev->axi_clk = NULL;
-				printk(KERN_ERR "%s: cannot get axi clk "
+			if (IS_ERR(msm_rotator_dev->core_clk)) {
+				rc = PTR_ERR(msm_rotator_dev->core_clk);
+				msm_rotator_dev->core_clk = NULL;
+				printk(KERN_ERR "%s: cannot get core clk "
 					"rc=%d\n", DRIVER_NAME, rc);
-			goto error_axi_clk;
+			goto error_core_clk;
 			}
 
 			if (pdata->rotator_clks[i].clk_rate)
-				clk_set_min_rate(msm_rotator_dev->axi_clk,
+				clk_set_rate(msm_rotator_dev->core_clk,
 					pdata->rotator_clks[i].clk_rate);
 		}
 	}
@@ -1446,11 +1538,16 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 	if (msm_rotator_dev->imem_clk)
 		clk_disable(msm_rotator_dev->imem_clk);
 #endif
-	if (ver != pdata->hardware_version_number) {
-		printk(KERN_ALERT "%s: invalid HW version\n", DRIVER_NAME);
-		rc = -ENODEV;
-		goto error_get_resource;
-	}
+	if (ver != pdata->hardware_version_number)
+		pr_info("%s: invalid HW version\n", DRIVER_NAME);
+
+	rotator_hw_revision = ver;
+	rotator_hw_revision >>= 16;     /* bit 31:16 */
+	rotator_hw_revision &= 0xff;
+
+	pr_info("%s: rotator_hw_revision=%x\n",
+		__func__, rotator_hw_revision);
+
 	msm_rotator_dev->irq = platform_get_irq(pdev, 0);
 	if (msm_rotator_dev->irq < 0) {
 		printk(KERN_ALERT "%s: could not get IORESOURCE_IRQ\n",
@@ -1518,8 +1615,8 @@ error_get_resource:
 	mutex_destroy(&msm_rotator_dev->rotator_lock);
 	if (msm_rotator_dev->regulator)
 		regulator_put(msm_rotator_dev->regulator);
-	clk_put(msm_rotator_dev->axi_clk);
-error_axi_clk:
+	clk_put(msm_rotator_dev->core_clk);
+error_core_clk:
 	clk_put(msm_rotator_dev->pclk);
 error_pclk:
 	if (msm_rotator_dev->imem_clk)
@@ -1534,6 +1631,9 @@ static int __devexit msm_rotator_remove(struct platform_device *plat_dev)
 {
 	int i;
 
+#ifdef CONFIG_MSM_BUS_SCALING
+	msm_bus_scale_unregister_client(msm_rotator_dev->bus_client_handle);
+#endif
 	free_irq(msm_rotator_dev->irq, NULL);
 	mutex_destroy(&msm_rotator_dev->rotator_lock);
 	cdev_del(&msm_rotator_dev->cdev);
@@ -1549,12 +1649,12 @@ static int __devexit msm_rotator_remove(struct platform_device *plat_dev)
 	}
 	if (msm_rotator_dev->rot_clk_state == CLK_EN)
 		disable_rot_clks();
+	clk_put(msm_rotator_dev->core_clk);
 	clk_put(msm_rotator_dev->pclk);
-	clk_put(msm_rotator_dev->axi_clk);
 	if (msm_rotator_dev->regulator)
 		regulator_put(msm_rotator_dev->regulator);
+	msm_rotator_dev->core_clk = NULL;
 	msm_rotator_dev->pclk = NULL;
-	msm_rotator_dev->axi_clk = NULL;
 	mutex_destroy(&msm_rotator_dev->imem_lock);
 	for (i = 0; i < MAX_SESSIONS; i++)
 		if (msm_rotator_dev->img_info[i] != NULL)
