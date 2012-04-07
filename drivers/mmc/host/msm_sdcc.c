@@ -89,7 +89,7 @@ static struct mmc_command dummy52cmd = {
 #define WRITE_WAIT_DAT0_MAX 10
 
 #define VERBOSE_COMMAND_TIMEOUTS 1
-#define SDC_CLK_VERBOSE 1
+#define SDC_CLK_VERBOSE 0
 
 #define DBG(host, fmt, args...)	\
 	pr_debug("%s: %s: " fmt "\n", mmc_hostname(host->mmc), __func__ , args)
