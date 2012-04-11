@@ -222,6 +222,7 @@ struct vcd_clnt_ctxt {
 	struct vcd_clnt_status status;
 
 	struct vcd_clnt_ctxt *next;
+	u32 meta_mode;
 };
 
 #define VCD_BUFFERPOOL_INUSE_DECREMENT(val) \
