@@ -439,6 +439,8 @@ _kgsl_sharedmem_vmalloc(struct kgsl_memdesc *memdesc,
 		}
 		sg_set_page(&memdesc->sg[i], page, PAGE_SIZE, 0);
 	}
+	outer_cache_range_op_sg(memdesc->sg, memdesc->sglen,
+				KGSL_CACHE_OP_FLUSH);
 
 	kgsl_cache_range_op(memdesc, KGSL_CACHE_OP_INV);
 
