@@ -1833,6 +1833,9 @@ extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *
 extern int task_free_register(struct notifier_block *n);
 extern int task_free_unregister(struct notifier_block *n);
 
+extern int task_fork_register(struct notifier_block *n);
+extern int task_fork_unregister(struct notifier_block *n);
+
 /*
  * Per process flags
  */

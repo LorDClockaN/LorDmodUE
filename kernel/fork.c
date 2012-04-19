@@ -1385,6 +1385,21 @@ struct task_struct * __cpuinit fork_idle(int cpu)
 	return task;
 }
 
+/* Notifier list called when a task struct is freed */
+static ATOMIC_NOTIFIER_HEAD(task_fork_notifier);
+
+int task_fork_register(struct notifier_block *n)
+{
+	return atomic_notifier_chain_register(&task_fork_notifier, n);
+}
+EXPORT_SYMBOL(task_fork_register);
+
+int task_fork_unregister(struct notifier_block *n)
+{
+	return atomic_notifier_chain_unregister(&task_fork_notifier, n);
+}
+EXPORT_SYMBOL(task_fork_unregister);
+
 /*
  *  Ok, this is the main fork-routine.
  *
