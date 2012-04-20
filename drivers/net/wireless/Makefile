@@ -59,4 +59,4 @@ else
   obj-$(CONFIG_BCM4329)	+= bcm4329_204/
 endif
 
-  obj-$(CONFIG_BCM4329)	+= bcmdhd/
+  obj-$(CONFIG_BCMDHD)	+= bcmdhd/
