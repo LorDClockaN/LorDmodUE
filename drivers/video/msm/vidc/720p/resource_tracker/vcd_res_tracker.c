@@ -423,7 +423,9 @@ static u32 res_trk_convert_perf_lvl_to_freq(u64 perf_lvl)
 	return (u32)freq;
 }
 
+#ifdef AXI_CLK_SCALING
 static struct pm_qos_request_list *qos_req_list;
+#endif
 
 u32 res_trk_power_up(void)
 {
