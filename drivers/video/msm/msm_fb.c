@@ -103,7 +103,7 @@ struct mdp_device *mdp;
 static atomic_t mdpclk_on = ATOMIC_INIT(1);
 #endif
 
-DEFINE_SEMAPHORE(ov_semaphore);
+DECLARE_MUTEX(ov_semaphore);
 static DEFINE_MUTEX(overlay_ioctl_mutex);
 
 #if (defined(CONFIG_USB_FUNCTION_PROJECTOR) || defined(CONFIG_USB_ANDROID_PROJECTOR))
@@ -894,7 +894,7 @@ static int msmfb_overlay_change_z_order_vg_pipes(struct fb_info *info, unsigned 
 }
 #endif
 
-DEFINE_SEMAPHORE(msm_fb_ioctl_ppp_sem);
+DECLARE_MUTEX(msm_fb_ioctl_ppp_sem);
 #if defined(CONFIG_FB_MSM_MDP_ABL)
 DEFINE_MUTEX(msm_fb_ioctl_lut_sem);
 DEFINE_MUTEX(msm_fb_ioctl_hist_sem);
