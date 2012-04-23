@@ -49,6 +49,9 @@ struct mdp_info {
 	struct clk *clk;
 	struct clk *pclk;
 	struct clk *ebi1_clk;
+#ifdef CONFIG_MDP4_HW_VSYNC
+	struct clk *vsync_clk;
+#endif
 	struct mdp_out_interface out_if[MSM_MDP_NUM_INTERFACES];
 	int dma_format;
 	int dma_pack_pattern;
@@ -59,6 +62,9 @@ struct mdp_info {
 	struct timer_list dma_timer;
 #ifdef CONFIG_MSM_MDP40
 	int hw_version;
+#endif
+#ifdef CONFIG_MDP4_HW_VSYNC
+	int total_lcd_line;
 #endif
 	int (*enable_irq)(struct mdp_info *mdp, uint32_t mask);
 	int (*disable_irq)(struct mdp_info *mdp, uint32_t mask);
@@ -153,6 +159,7 @@ extern int mdp_out_if_req_irq(struct mdp_device *mdp_dev, int interface,
 struct mdp_blit_req;
 struct mdp_device;
 
+struct msm_mdp_platform_data;
 void mdp_ppp_dump_debug(const struct mdp_info *mdp);
 int mdp_hw_init(struct mdp_info *mdp);
 void mdp_check_tearing(struct mdp_info *mdp, struct msm_mdp_platform_data *pdata);
@@ -171,54 +178,54 @@ int mdp_wait(struct mdp_info *mdp, uint32_t mask, wait_queue_head_t *wq);
 #define MDP4_REVISION_V2			1
 #define MDP4_REVISION_V2_1			2
 #define MDP4_REVISION_NONE		0xffffffff
-#define MDP_AXI_RDMASTER_CONFIG		( 0x00028)
+#define MDP_AXI_RDMASTER_CONFIG		(0x00028)
 
 #ifdef CONFIG_MSM_MDP302
-#define MDP_SYNC_CONFIG_0                ( 0x00300)
-#define MDP_SYNC_CONFIG_1                ( 0x00304)
-#define MDP_SYNC_CONFIG_2                ( 0x00308)
+#define MDP_SYNC_CONFIG_0                (0x00300)
+#define MDP_SYNC_CONFIG_1                (0x00304)
+#define MDP_SYNC_CONFIG_2                (0x00308)
 #else
-#define MDP_SYNC_CONFIG_0                ( 0x00000)
-#define MDP_SYNC_CONFIG_1                ( 0x00004)
-#define MDP_SYNC_CONFIG_2                ( 0x00008)
+#define MDP_SYNC_CONFIG_0                (0x00000)
+#define MDP_SYNC_CONFIG_1                (0x00004)
+#define MDP_SYNC_CONFIG_2                (0x00008)
 #endif
 
-#define MDP_SYNC_STATUS_0                ( 0x0000c)
-#define MDP_SYNC_STATUS_1                ( 0x00010)
-#define MDP_SYNC_STATUS_2                ( 0x00014)
+#define MDP_SYNC_STATUS_0                (0x0000c)
+#define MDP_SYNC_STATUS_1                (0x00010)
+#define MDP_SYNC_STATUS_2                (0x00014)
 
 #ifdef CONFIG_MSM_MDP302
-#define MDP_SYNC_THRESH_0                ( 0x00200)
-#define MDP_SYNC_THRESH_1                ( 0x00204)
+#define MDP_SYNC_THRESH_0                (0x00200)
+#define MDP_SYNC_THRESH_1                (0x00204)
 #else
-#define MDP_SYNC_THRESH_0                ( 0x00018)
-#define MDP_SYNC_THRESH_1                ( 0x0001c)
+#define MDP_SYNC_THRESH_0                (0x00018)
+#define MDP_SYNC_THRESH_1                (0x0001c)
 #endif
 #ifdef CONFIG_MSM_MDP40
-#define MDP_INTR_ENABLE                  ( 0x0050)
-#define MDP_INTR_STATUS                  ( 0x0054)
-#define MDP_INTR_CLEAR                   ( 0x0058)
-#define MDP_EBI2_LCD0                    ( 0x0060)
-#define MDP_EBI2_LCD1                    ( 0x0064)
-#define MDP_EBI2_PORTMAP_MODE            ( 0x0070)
+#define MDP_INTR_ENABLE                  (0x0050)
+#define MDP_INTR_STATUS                  (0x0054)
+#define MDP_INTR_CLEAR                   (0x0058)
+#define MDP_EBI2_LCD0                    (0x0060)
+#define MDP_EBI2_LCD1                    (0x0064)
+#define MDP_EBI2_PORTMAP_MODE            (0x0070)
 
-#define MDP_DMA_P_HIST_INTR_STATUS 	( 0x95014)
-#define MDP_DMA_P_HIST_INTR_CLEAR 	( 0x95018)
-#define MDP_DMA_P_HIST_INTR_ENABLE 	( 0x9501C)
+#define MDP_DMA_P_HIST_INTR_STATUS 	(0x95014)
+#define MDP_DMA_P_HIST_INTR_CLEAR 	(0x95018)
+#define MDP_DMA_P_HIST_INTR_ENABLE 	(0x9501C)
 #else
-#define MDP_INTR_ENABLE                  ( 0x00020)
-#define MDP_INTR_STATUS                  ( 0x00024)
-#define MDP_INTR_CLEAR                   ( 0x00028)
-#define MDP_EBI2_LCD0                    ( 0x0003c)
-#define MDP_EBI2_LCD1                    ( 0x00040)
-#define MDP_EBI2_PORTMAP_MODE            ( 0x0005c)
+#define MDP_INTR_ENABLE                  (0x00020)
+#define MDP_INTR_STATUS                  (0x00024)
+#define MDP_INTR_CLEAR                   (0x00028)
+#define MDP_EBI2_LCD0                    (0x0003c)
+#define MDP_EBI2_LCD1                    (0x00040)
+#define MDP_EBI2_PORTMAP_MODE            (0x0005c)
 #endif
-#define MDP_DISPLAY0_START               ( 0x00030)
-#define MDP_DISPLAY1_START               ( 0x00034)
-#define MDP_DISPLAY_STATUS               ( 0x00038)
+#define MDP_DISPLAY0_START               (0x00030)
+#define MDP_DISPLAY1_START               (0x00034)
+#define MDP_DISPLAY_STATUS               (0x00038)
 /* CONFIG_MSM_MDP302 */
-#define MDP_TEAR_CHECK_EN                ( 0x0020c)
-#define MDP_PRIM_START_POS               ( 0x00210)
+#define MDP_TEAR_CHECK_EN                (0x0020c)
+#define MDP_PRIM_START_POS               (0x00210)
 
 #ifndef CONFIG_MSM_MDP31
 #define MDP_DISPLAY0_ADDR                (0x00054)

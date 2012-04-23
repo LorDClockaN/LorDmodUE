@@ -97,9 +97,8 @@ static void toshiba_wait_vsync(struct msm_panel_data *panel_data)
 		panel->toshiba_got_int = 0;
 		client_data->activate_link(client_data); /* clears interrupt */
 	}
-	if (wait_event_timeout(toshiba_vsync_wait, panel->toshiba_got_int,
-				HZ/2) == 0)
-		PR_DISP_ERR( "timeout waiting for VSYNC\n");
+	if (wait_event_timeout(toshiba_vsync_wait, panel->toshiba_got_int, HZ/2) == 0)
+		PR_DISP_ERR("timeout waiting for VSYNC\n");
 	panel->toshiba_got_int = 0;
 	/* interrupt clears when screen dma starts */
 }

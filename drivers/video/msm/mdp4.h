@@ -25,11 +25,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-
 #ifndef MDP4_H
 #define MDP4_H
 
-
+/*
+#define DEBUG_OVERLAY
+*/
 
 #define MDP4_NONBLOCKING	/* enable non blocking ioctl */
 
@@ -44,6 +45,12 @@
 
 #define MDP4_RGB_BASE 0x40000
 #define MDP4_RGB_OFF 0x10000
+
+enum mdp4_overlay_status {
+	MDP4_OVERLAY_TYPE_UNSET,
+	MDP4_OVERLAY_TYPE_SET,
+	MDP4_OVERLAY_TYPE_MAX
+};
 
 enum {		/* display */
 	PRIMARY_INTF_SEL,
@@ -103,7 +110,7 @@ enum {
 #define INTR_EXTERNAL_VSYNC		BIT(9)
 #define INTR_EXTERNAL_INTF_UDERRUN	BIT(10)
 #define INTR_DMA_P_HISTOGRAM		BIT(17)
-#define INTR_MDP_HIST_DONE       	BIT(20) //DMA_P histogram interrupt
+#define INTR_MDP_HIST_DONE       	BIT(20) /*DMA_P histogram interrupt*/
 
 /* histogram interrupts */
 #define INTR_HIST_DONE			BIT(1)
@@ -285,8 +292,8 @@ struct mdp4_overlay_pipe {
 };
 
 struct mdp4_pipe_desc {
-        uint32_t ref_cnt;
-        struct mdp4_overlay_pipe *player;
+	uint32_t ref_cnt;
+	struct mdp4_overlay_pipe *player;
 };
 
 #ifdef CONFIG_FB_MSM_WRITE_BACK
@@ -363,10 +370,13 @@ void mdp4_fetch_cfg(struct mdp_info *mdp, uint32_t clk, uint32_t pclk);
 uint32_t mdp4_rgb_igc_lut_cvt(uint32_t ndx);
 void mdp_pipe_kickoff(struct mdp_info *mdp, uint32_t term);
 
+void mdp4_overlay_status_write(enum mdp4_overlay_status type, bool val);
+bool mdp4_overlay_status_read(enum mdp4_overlay_status type);
+
 #ifdef CONFIG_FB_MSM_WRITE_BACK
 void mdp4_dma_p_done_mddi(void);
-int mdp4_overlay_blt(struct mdp_device *mdp_dev,struct fb_info *info, struct msmfb_overlay_blt *req,
-		struct file **pp_src_file);
+int mdp4_overlay_blt(struct mdp_device *mdp_dev, struct fb_info *info,
+		struct msmfb_overlay_blt *req, struct file **pp_src_file);
 void mdp4_mddi_overlay_blt(ulong addr);
 void mdp4_lcdc_overlay_blt(ulong addr);
 #endif

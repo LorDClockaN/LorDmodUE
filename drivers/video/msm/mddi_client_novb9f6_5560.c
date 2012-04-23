@@ -18,9 +18,11 @@
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/wakelock.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
 #include <mach/debug_display.h>
+#include <mach/panel_id.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(novtec_vsync_wait);
 
@@ -216,7 +218,9 @@ err_request_gpio_failed:
 
 static int mddi_novtec_probe(struct platform_device *pdev)
 {
+#ifndef CONFIG_MDP4_HW_VSYNC
 	int ret;
+#endif
 	struct msm_mddi_client_data *client_data = pdev->dev.platform_data;
 	struct msm_mddi_bridge_platform_data *bridge_data =
 		client_data->private_client_data;
@@ -245,12 +249,13 @@ static int mddi_novtec_probe(struct platform_device *pdev)
 	else
 		panel->vsync_gpio = panel_data->vsync_gpio;
 
+#ifndef CONFIG_MDP4_HW_VSYNC
 	ret = setup_vsync(panel, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "mddi_bridge_setup_vsync failed\n");
 		return ret;
 	}
-
+#endif
 	panel->client_data = client_data;
 	panel->panel_data.suspend = novtec_suspend;
 	panel->panel_data.resume = novtec_resume;

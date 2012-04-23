@@ -240,7 +240,7 @@ void mdp4_hw_init(struct mdp_info *mdp)
 {
 	ulong bits;
 
-	PR_DISP_WARN("%s\n",__func__);
+	PR_DISP_WARN("%s\n", __func__);
 #ifdef MDP4_ERROR
 	/*
 	 * Issue software reset on DMA_P will casue DMA_P dma engine stall
@@ -299,7 +299,7 @@ void mdp4_hw_init(struct mdp_info *mdp)
 
 	/* enable histogram interrupts */
 	mdp_writel(mdp, INTR_HIST_DONE, 0x9501c);
-#if defined (CONFIG_FB_MSM_MDP_ABL)
+#if defined(CONFIG_FB_MSM_MDP_ABL)
 	mdp_writel(mdp, MDP_HIST_DONE, MDP_INTR_ENABLE);
 #endif
 	/* For the max read pending cmd config below, if the MDP clock     */
@@ -904,7 +904,7 @@ void mdp4_vg_qseed_init(struct mdp_info *mdp, int vp_num)
 
 }
 
-void mdp4_mixer_blend_init(struct mdp_info *mdp,int mixer_num)
+void mdp4_mixer_blend_init(struct mdp_info *mdp, int mixer_num)
 {
 	unsigned long overlay_base;
 	int off;
@@ -1046,7 +1046,7 @@ void mdp4_mixer1_csc_mv_setup(struct mdp_info *mdp)
 
 	for (i = 0; i < 9; i++) {
 		mdp_writel(mdp, csc_rgb2yuv_matrix_tab[i], off);
-		off+=4;
+		off += 4;
 	}
 }
 
@@ -1059,7 +1059,7 @@ void mdp4_mixer1_csc_pre_bv_setup(struct mdp_info *mdp)
 
 	for (i = 0; i < 3; i++) {
 		mdp_writel(mdp, csc_rgb2yuv_pre_bv_tab[i], off);
-		off+=4;
+		off += 4;
 	}
 }
 
@@ -1072,7 +1072,7 @@ void mdp4_mixer1_csc_post_bv_setup(struct mdp_info *mdp)
 
 	for (i = 0; i < 3; i++) {
 		mdp_writel(mdp, csc_rgb2yuv_post_bv_tab[i], off);
-		off+=4;
+		off += 4;
 	}
 }
 
@@ -1085,7 +1085,7 @@ void mdp4_mixer1_csc_pre_lv_setup(struct mdp_info *mdp)
 
 	for (i = 0; i < 6; i++) {
 		mdp_writel(mdp, csc_rgb2yuv_pre_lv_tab[i], off);
-		off+=4;
+		off += 4;
 	}
 }
 
@@ -1098,7 +1098,7 @@ void mdp4_mixer1_csc_post_lv_setup(struct mdp_info *mdp)
 
 	for (i = 0; i < 6; i++) {
 		mdp_writel(mdp, csc_rgb2yuv_post_lv_tab[i], off);
-		off+=4;
+		off += 4;
 	}
 }
 

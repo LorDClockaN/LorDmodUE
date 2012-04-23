@@ -19,6 +19,8 @@
 #include <linux/gpio.h>
 #include <linux/wakelock.h>
 #include <linux/slab.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
 #include <mach/msm_fb.h>
 #include <mach/debug_display.h>
 
@@ -93,7 +95,7 @@ static int renesas_suspend(struct msm_panel_data *panel_data)
 	ret = bridge_data->uninit(bridge_data, client_data);
 	wake_unlock(&panel->idle_lock);
 	if (ret) {
-		PR_DISP_INFO( "mddi renesas client: non zero return from "
+		PR_DISP_INFO("mddi renesas client: non zero return from "
 			"uninit\n");
 		return ret;
 	}
@@ -184,7 +186,7 @@ static int setup_vsync(struct panel_info *panel,
 			  "vsync", panel);
 	if (ret)
 		goto err_request_irq_failed;
-	PR_DISP_INFO( "vsync on gpio %d now %d\n",
+	PR_DISP_INFO("vsync on gpio %d now %d\n",
 	       gpio, gpio_get_value(gpio));
 	return 0;
 

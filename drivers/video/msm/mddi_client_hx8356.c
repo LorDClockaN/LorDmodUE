@@ -66,11 +66,11 @@ struct panel_info {
 
 static struct cabc_config cabc_config;
 static struct platform_device mddi_himax_cabc = {
-        .name = "himax_cabc",
-        .id = 0,
-        .dev = {
-                .platform_data = &cabc_config,
-        }
+	.name = "himax_cabc",
+	.id = 0,
+	.dev = {
+		.platform_data = &cabc_config,
+	}
 };
 
 static struct clk *ebi1_clk;
@@ -80,13 +80,14 @@ static void himax_dump_vsync(void)
 	B(KERN_DEBUG "%s: enter.\n", __func__);
 }
 
-static void himax_adjust_work(struct work_struct *work){
-	struct panel_info * panel = container_of(work, struct panel_info, adjust_panel_work);
+static void himax_adjust_work(struct work_struct *work)
+{
+	struct panel_info *panel = container_of(work, struct panel_info, adjust_panel_work);
 	struct msm_mddi_client_data *client_data = panel->client_data;
 	struct msm_mddi_bridge_platform_data *bridge_data =
 		client_data->private_client_data;
 
-	if(bridge_data->adjust)
+	if (bridge_data->adjust)
 		bridge_data->adjust(client_data);
 
 	atomic_set(&panel->frame_counter, INTERVAL_ADJUSTING);
@@ -192,7 +193,7 @@ static int himax_unblank(struct msm_panel_data *panel_data)
 	struct msm_mddi_bridge_platform_data *bridge_data =
 	    client_data->private_client_data;
 
-	if(cabc_config.bl_handle) {
+	if (cabc_config.bl_handle) {
 		mdelay(40);
 		cabc_config.bl_handle(&mddi_himax_cabc, LED_FULL);
 	}
@@ -262,7 +263,7 @@ static int mddi_himax_probe(struct platform_device *pdev)
 	struct msm_mddi_client_data *client_data = pdev->dev.platform_data;
 	struct msm_mddi_bridge_platform_data *bridge_data =
 	    client_data->private_client_data;
-        struct panel_data *panel_data = &bridge_data->panel_conf;
+	struct panel_data *panel_data = &bridge_data->panel_conf;
 
 	B(KERN_DEBUG "%s: enter\n", __func__);
 
@@ -280,16 +281,16 @@ static int mddi_himax_probe(struct platform_device *pdev)
 		goto err_panel;
 	}
 
-        cabc_config.pwm_data = panel_data->pwm;
-        cabc_config.min_level = panel_data->min_level;
-        cabc_config.shrink = panel_data->shrink;
-        cabc_config.shrink_br = panel_data->shrink_br;
-        cabc_config.change_cabcmode = panel_data->change_cabcmode;
-        if (panel_data->caps & MSMFB_CAP_CABC) {
-                PR_DISP_INFO("CABC enabled\n");
-                cabc_config.client = client_data;
-                platform_device_register(&mddi_himax_cabc);
-        }
+	cabc_config.pwm_data = panel_data->pwm;
+	cabc_config.min_level = panel_data->min_level;
+	cabc_config.shrink = panel_data->shrink;
+	cabc_config.shrink_br = panel_data->shrink_br;
+	cabc_config.change_cabcmode = panel_data->change_cabcmode;
+	if (panel_data->caps & MSMFB_CAP_CABC) {
+		PR_DISP_INFO("CABC enabled\n");
+		cabc_config.client = client_data;
+		platform_device_register(&mddi_himax_cabc);
+	}
 
 	panel->client_data = client_data;
 	panel->panel_data.suspend = himax_suspend;

@@ -126,15 +126,15 @@
 /* MDP sends 256 pixel packets, so lower value hibernates more without
  * significantly increasing latency of waiting for next subframe */
 #define MDDI_HOST_BYTES_PER_SUBFRAME  0x3C00
-#if defined (CONFIG_ARCH_QSD8X50) || defined (CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM7X30)
 #define MDDI_HOST_TA2_LEN       0x001a
 #else
 #define MDDI_HOST_TA2_LEN       0x000c
 #endif
 
-#if defined (CONFIG_ARCH_QSD8X50)
+#if defined(CONFIG_ARCH_QSD8X50)
 #define MDDI_HOST_REV_RATE_DIV  0x0004
-#elif defined (CONFIG_ARCH_MSM7X30)
+#elif defined(CONFIG_ARCH_MSM7X30)
 #define MDDI_HOST_REV_RATE_DIV  0x0010
 #else
 #define MDDI_HOST_REV_RATE_DIV  0x0002
@@ -316,5 +316,8 @@ struct __attribute__((packed)) mddi_llentry {
 		uint32_t _[12];
 	} u;
 };
+
+extern int overlay_semaphore_lock(void);
+extern void overlay_semaphore_unlock(void);
 
 #endif

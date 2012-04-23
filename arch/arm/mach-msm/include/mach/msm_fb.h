@@ -18,6 +18,9 @@
 #define _MSM_FB_H_
 
 #include <linux/device.h>
+#include <linux/earlysuspend.h>
+#include <linux/wakelock.h>
+#include <linux/msm_mdp.h>
 
 struct mddi_info;
 struct mdp_device;
@@ -35,8 +38,6 @@ struct mdp_device;
 #define MSM_MDP_DMA_PACK_ALIGN_LSB		(1 << 4)
 #define MSM_MDP_RGB_PANEL_SELE_REFRESH		(1 << 5)
 #define MSM_MDP_ABL_ENABLE			(1 << 6)
-#define MSM_MDP_FORCE_UPDATE			(1 << 7)
-
 
 /* mddi type */
 #define MSM_MDP_MDDI_TYPE_I	 0
@@ -155,6 +156,13 @@ struct msm_mdp_platform_data {
 	unsigned sync_start_pos;
 	struct mdp_device *mdp_dev;
 	struct gamma_curvy *abl_gamma_tbl;
+#ifdef CONFIG_MDP4_HW_VSYNC
+	uint32_t xres;
+	uint32_t yres;
+	uint32_t back_porch;
+	uint32_t front_porch;
+	uint32_t pulse_width;
+#endif
 };
 
 struct msm_mddi_client_data {
@@ -163,12 +171,12 @@ struct msm_mddi_client_data {
 	void (*activate_link)(struct msm_mddi_client_data *);
 	void (*remote_write)(struct msm_mddi_client_data *, uint32_t val,
 			     uint32_t reg);
-	void (*remote_write_vals)(struct msm_mddi_client_data *, uint8_t * val,
+	void (*remote_write_vals)(struct msm_mddi_client_data *, uint8_t *val,
 			     uint32_t reg, unsigned int nr_bytes);
 	uint32_t (*remote_read)(struct msm_mddi_client_data *, uint32_t reg);
 	void (*auto_hibernate)(struct msm_mddi_client_data *, int);
 	void (*send_powerdown)(struct msm_mddi_client_data *);
-	/* custom data that needs to be passed from the board file to a 
+	/* custom data that needs to be passed from the board file to a
 	 * particular client */
 	void *private_client_data;
 	struct resource *fb_resource;
@@ -265,7 +273,7 @@ struct mdp_device {
 	int (*check_output_format)(struct mdp_device *mdp, int bpp);
 	int (*set_output_format)(struct mdp_device *mdp, int bpp);
 	void (*set_panel_size)(struct mdp_device *mdp, int width, int height);
-#if defined (CONFIG_FB_MSM_MDP_ABL)
+#if defined(CONFIG_FB_MSM_MDP_ABL)
 	int (*lut_update)(struct mdp_device *mdp, struct fb_info *fb,
 		    struct fb_cmap *cmap);
 	int (*do_histogram)(struct mdp_device *mdp, struct mdp_histogram *hist_in,
@@ -279,6 +287,13 @@ struct mdp_device {
 	unsigned overrides;
 	uint32_t width;		/*panel width*/
 	uint32_t height;	/*panel height*/
+#ifdef CONFIG_MDP4_HW_VSYNC
+	uint32_t xres;
+	uint32_t yres;
+	uint32_t back_porch;
+	uint32_t front_porch;
+	uint32_t pulse_width;
+#endif
 	struct fb_info *fb0;
 	struct fb_info *fb1;
 };
@@ -339,8 +354,47 @@ struct msm_mddi_bridge_platform_data {
 	u8 *pwm;
 };
 
+struct msmfb_info {
+	struct fb_info *fb;
+	struct msm_panel_data *panel;
+	int xres;
+	int yres;
+	unsigned output_format;
+	unsigned yoffset;
+	unsigned frame_requested;
+	unsigned frame_done;
+	int sleeping;
+	unsigned update_frame;
+	struct {
+		int left;
+		int top;
+		int eright; /* exclusive */
+		int ebottom; /* exclusive */
+	} update_info;
+	char *black;
+
+	struct early_suspend earlier_suspend;
+	struct early_suspend early_suspend;
+#ifdef CONFIG_HTC_ONMODE_CHARGING
+	struct early_suspend onchg_earlier_suspend;
+	struct early_suspend onchg_suspend;
+#endif
+	struct wake_lock idle_lock;
+	spinlock_t update_lock;
+	struct mutex panel_init_lock;
+	wait_queue_head_t frame_wq;
+	struct workqueue_struct *resume_workqueue;
+	struct work_struct resume_work;
+	struct msmfb_callback dma_callback;
+	struct msmfb_callback vsync_callback;
+	struct hrtimer fake_vsync;
+	ktime_t vsync_request_time;
+	unsigned fb_resumed;
+	unsigned overrides;
+};
+
 /*
- * This is used to communicate event between msm_fb, mddi, mddi_client, 
+ * This is used to communicate event between msm_fb, mddi, mddi_client,
  * and board.
  * It's mainly used to reset the display system.
  * Also, it is used for battery power policy.
@@ -352,7 +406,7 @@ struct msm_mddi_bridge_platform_data {
 
 extern int register_display_notifier(struct notifier_block *nb);
 extern int display_notifier_call_chain(unsigned long val, void *data);
- 
+
 #define display_notifier(fn, pri) {                     \
 	static struct notifier_block fn##_nb =          \
 	{ .notifier_call = fn, .priority = pri };       \
@@ -370,10 +424,10 @@ struct msm_fb_info {
 
 extern int msmfb_get_var(struct msm_fb_info *tmp);
 extern int msmfb_get_fb_area(void);
-#if defined (CONFIG_FB_MSM_MDP_ABL)
+#if defined(CONFIG_FB_MSM_MDP_ABL)
 extern struct mdp_histogram mdp_hist;
 extern struct completion mdp_hist_comp;
 #endif
 #endif
 
-#endif
+#endif /* _MSM_FB_7X30_H_ */

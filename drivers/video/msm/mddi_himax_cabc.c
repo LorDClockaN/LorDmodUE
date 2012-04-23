@@ -11,13 +11,13 @@
  * GNU General Public License for more details.
  */
 #include <linux/module.h>
+#include <linux/leds.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
 #include <linux/wakelock.h>
-#include <mach/htc_battery.h>
 #include <mach/htc_pwrsink.h>
 #include <mach/msm_panel.h>
 #include "mddi_client_eid.h"
@@ -87,7 +87,7 @@ enum {
 #define to_cabc(p, m) container_of(p, struct cabc, m)
 
 static inline
-struct msm_mddi_client_data *cabc_get_client(struct cabc* cabc)
+struct msm_mddi_client_data *cabc_get_client(struct cabc *cabc)
 {
 	struct cabc_config *data = cabc->cabc_config;
 	return data->client;
@@ -130,11 +130,11 @@ __set_brightness(struct cabc *cabc, int brightness, u8 dimming)
 		(test_bit(LS_STATE, &cabc->status) ? "on" : "off"));
 
 	mutex_lock(&cabc->data_lock);
-	if(cabc->cabc_config->shrink && cabc->cabc_config->shrink_br)
+	if (cabc->cabc_config->shrink && cabc->cabc_config->shrink_br)
 		shrink_br = cabc->cabc_config->shrink_br(brightness);
 	else
 		shrink_br = cabc_shrink(cabc, brightness);
-        client_data->remote_write(client_data, (u8)shrink_br, 0x94);
+	client_data->remote_write(client_data, (u8)shrink_br, 0x94);
 	g_brightness = brightness;
 	mutex_unlock(&cabc->data_lock);
 	return 0;
@@ -170,7 +170,7 @@ static void cabc_lcd_work(struct work_struct *work)
 	 * already passed. */
 	if ((test_bit(SUSPEND, &cabc->status) == 0) &&
 	    (test_bit(ENFORCE_ON, &cabc->status) == 0)) {
-		if(led_cdev->brightness >= 0 && led_cdev->brightness <= 255)
+		if (led_cdev->brightness >= 0 && led_cdev->brightness <= 255)
 			__set_brightness(cabc, led_cdev->brightness, 1U << 3);
 
 		sprintf(event_string, "CABC_BRIGHTNESS=%d",
@@ -236,29 +236,29 @@ static void cabc_auto_work(struct work_struct *work)
 static int
 cabc_bl_handle(struct platform_device *pdev, int brightness)
 {
-        struct cabc *cabc = platform_get_drvdata(pdev);
-        struct led_classdev *lcd_cdev;
+	struct cabc *cabc = platform_get_drvdata(pdev);
+	struct led_classdev *lcd_cdev;
 
-        if (unlikely(cabc == NULL)) {
-                PR_DISP_ERR("%s: do not have cabc data\n", __func__);
-                return -ENOENT;
-        }
+	if (unlikely(cabc == NULL)) {
+			PR_DISP_ERR("%s: do not have cabc data\n", __func__);
+			return -ENOENT;
+	}
 
-        PR_DISP_DEBUG("turn %s backlight.\n",
-                        brightness == LED_FULL ? "on" : "off");
+	PR_DISP_DEBUG("turn %s backlight.\n",
+					brightness == LED_FULL ? "on" : "off");
 
-        lcd_cdev = &cabc->lcd_backlight;
-        wake_lock(&cabc->wakelock);
+	lcd_cdev = &cabc->lcd_backlight;
+	wake_lock(&cabc->wakelock);
 
-        if (brightness != LED_FULL) {
-		/* enter screen off*/
-        } else {
+	if (brightness != LED_FULL) {
+	/* enter screen off */
+	} else {
 		__set_brightness(cabc, (g_brightness >= 0 && g_brightness <= LED_FULL)?
-			g_brightness : LED_FULL, 0);
-        }
+		    g_brightness : LED_FULL, 0);
+	}
 
-        wake_unlock(&cabc->wakelock);
-        return 0;
+	wake_unlock(&cabc->wakelock);
+	return 0;
 }
 
 static int

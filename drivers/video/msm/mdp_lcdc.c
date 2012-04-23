@@ -158,11 +158,11 @@ static void icm_force_leave(void)
 			panel_ops->refresh_disable(panel_ops);
 		panel_icm->icm_mode = false;
 		panel_icm->icm_doable = true;
-                PR_DISP_INFO("ForceLeaveICM: leave ICM MODE done !!!\n");
+		PR_DISP_INFO("ForceLeaveICM: leave ICM MODE done !!!\n");
 	}
 	spin_lock_irqsave(&panel_icm->lock, irq_flags);
-        panel_icm->panel_update = 0;
-        spin_unlock_irqrestore(&panel_icm->lock, irq_flags);
+	panel_icm->panel_update = 0;
+	spin_unlock_irqrestore(&panel_icm->lock, irq_flags);
 	mutex_unlock(&panel_icm->icm_lock);
 }
 
@@ -201,12 +201,12 @@ void mdp4_lcdc_overlay_blt(ulong addr)
        lcdc_pipe->blt_addr = addr;
        lcdc_pipe->blt_cnt = 0;
        spin_unlock_irqrestore(&mdp_spin_lock, flag);
-       mdp_writel(lcdc_pipe->mdp,0x0,0xc0000);
+       mdp_writel(lcdc_pipe->mdp, 0x0, 0xc0000);
        mdelay(100);
        mdp4_overlayproc_cfg(lcdc_pipe);
        mdp4_overlay_dmap_xy(lcdc_pipe);
        mdelay(100);
-       mdp_writel(lcdc_pipe->mdp,0x1,0xc0000);
+       mdp_writel(lcdc_pipe->mdp, 0x1, 0xc0000);
 }
 #endif
 
@@ -238,15 +238,15 @@ static int lcdc_blank(struct msm_panel_data *fb_panel)
 
 static int lcdc_shutdown(struct msm_panel_data *fb_panel)
 {
-        struct mdp_lcdc_info *lcdc = panel_to_lcdc(fb_panel);
-        struct msm_lcdc_panel_ops *panel_ops = lcdc->pdata->panel_ops;
+	struct mdp_lcdc_info *lcdc = panel_to_lcdc(fb_panel);
+	struct msm_lcdc_panel_ops *panel_ops = lcdc->pdata->panel_ops;
 
-        PR_DISP_INFO("%s: ()\n", __func__);
+	PR_DISP_INFO("%s: ()\n", __func__);
 
 	if (panel_ops->shutdown)
-	        panel_ops->shutdown(panel_ops);
+		panel_ops->shutdown(panel_ops);
 
-        return 0;
+	return 0;
 }
 
 static int lcdc_suspend(struct msm_panel_data *fb_panel)
@@ -379,7 +379,7 @@ static int lcdc_hw_init(struct mdp_lcdc_info *lcdc)
 		   DMA_DITHER_EN);
 	dma_cfg |= DMA_OUT_SEL_LCDC;
 	dma_cfg &= ~DMA_DST_BITS_MASK;
-	if(lcdc->color_format == MSM_MDP_OUT_IF_FMT_RGB565)
+	if (lcdc->color_format == MSM_MDP_OUT_IF_FMT_RGB565)
 		dma_cfg |= DMA_DSTC0G_6BITS | DMA_DSTC1B_5BITS | DMA_DSTC2R_5BITS;
 	else if (lcdc->color_format == MSM_MDP_OUT_IF_FMT_RGB666)
 		dma_cfg |= DMA_DSTC0G_6BITS | DMA_DSTC1B_6BITS | DMA_DSTC2R_6BITS;
@@ -448,12 +448,11 @@ static void lcdc_overlay_start(void *priv, uint32_t addr, uint32_t stride,
 	pipe = lcdc_pipe;
 	pipe->srcp0_addr = addr;
 
-	if (mdp->dma_config_dirty)
-	{
-		if(mdp->dma_format == DMA_IBUF_FORMAT_RGB565) {
+	if (mdp->dma_config_dirty) {
+		if (mdp->dma_format == DMA_IBUF_FORMAT_RGB565) {
 			pipe->src_format = MDP_RGB_565;
 			pipe->srcp0_ystride = pipe->src_width * 2;
-		} else if(mdp->dma_format == DMA_IBUF_FORMAT_XRGB8888) {
+		} else if (mdp->dma_format == DMA_IBUF_FORMAT_XRGB8888) {
 			pipe->src_format = MDP_RGBA_8888;
 			pipe->srcp0_ystride = pipe->src_width * 4;
 		}
@@ -480,8 +479,7 @@ static void lcdc_dma_start(void *priv, uint32_t addr, uint32_t stride,
 {
 	struct mdp_lcdc_info *lcdc = priv;
 	struct mdp_info *mdp = container_of(mdp_dev, struct mdp_info, mdp_dev);
-	if (mdp->dma_config_dirty)
-	{
+	if (mdp->dma_config_dirty) {
 		mdp_writel(lcdc->mdp, 0, MDP_LCDC_EN);
 		mdelay(30);
 		mdp_dev->configure_dma(mdp_dev);
@@ -503,7 +501,6 @@ static void precompute_timing_parms(struct mdp_lcdc_info *lcdc)
 	unsigned int display_vstart;
 	unsigned int display_vend;
 
-//#if !defined(CONFIG_MACH_FLYER_SCREEN_ROTATION)
 	hsync_period = (timing->hsync_pulse_width + timing->hsync_back_porch +
 			fb_data->xres + timing->hsync_front_porch);
 	hsync_start_x = (timing->hsync_pulse_width + timing->hsync_back_porch);
@@ -597,8 +594,7 @@ static int mdp_lcdc_probe(struct platform_device *pdev)
 	precompute_timing_parms(lcdc);
 
 	lcdc->fb_start = pdata->fb_resource->start;
-	//lcdc->mdp = container_of(mdp_dev, struct mdp_info, mdp_dev);
-	if(lcdc->mdp->mdp_dev.color_format)
+	if (lcdc->mdp->mdp_dev.color_format)
 		lcdc->color_format = lcdc->mdp->mdp_dev.color_format;
 	else
 		lcdc->color_format = MSM_MDP_OUT_IF_FMT_RGB565;

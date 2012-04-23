@@ -91,43 +91,43 @@ static ulong blt_addr;
 #ifdef CONFIG_FB_MSM_WRITE_BACK
 void mdp4_mddi_overlay_blt(ulong addr)
 {
-       unsigned long flag;
+	unsigned long flag;
 
-       spin_lock_irqsave(&mdp_spin_lock, flag);
-       if (addr) {
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	if (addr) {
 		mdp_intr_mask |= INTR_DMA_P_DONE;
-		if(mddi_pipe!=NULL){
-			mdp_writel(mddi_pipe->mdp,mdp_intr_mask,MDP_INTR_ENABLE);
+		if (mddi_pipe != NULL) {
+			mdp_writel(mddi_pipe->mdp, mdp_intr_mask, MDP_INTR_ENABLE);
 			mddi_pipe->blt_cnt = 0;
 			mddi_pipe->blt_end = 0;
 			mddi_pipe->blt_addr = addr;
-			}
+		}
 		blt_addr = addr;
-       } else {
+	} else {
 		mddi_pipe->blt_end = 1; /* mark as end */
 		mdp4_dma_p_done_mddi();
-       }
-       spin_unlock_irqrestore(&mdp_spin_lock, flag);
+	}
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 }
 void mdp4_blt_xy_update(struct mdp4_overlay_pipe *pipe)
 {
-       uint32_t off, addr;
+	uint32_t off, addr;
 
-       if (pipe->blt_addr == 0)
-               return;
+	if (pipe->blt_addr == 0)
+		return;
 
-       /* overlay ouput is RG565 */
-       off = 0;
-       if (pipe->blt_cnt & 0x01)
-               off = pipe->src_height * pipe->src_width * 2;
+	/* overlay ouput is RG565 */
+	off = 0;
+	if (pipe->blt_cnt & 0x01)
+		off = pipe->src_height * pipe->src_width * 2;
 
-	addr = pipe->blt_addr+ off;
+	addr = pipe->blt_addr + off;
 
-       /* dmap */
+	/* dmap */
 	mdp_writel(pipe->mdp, addr, 0x90008);
-       /* overlay 0 */
-       mdp_writel(pipe->mdp, addr, MDP4_OVERLAYPROC0_BASE + 0x000c);
-       mdp_writel(pipe->mdp, addr, MDP4_OVERLAYPROC0_BASE + 0x001c);
+	/* overlay 0 */
+	mdp_writel(pipe->mdp, addr, MDP4_OVERLAYPROC0_BASE + 0x000c);
+	mdp_writel(pipe->mdp, addr, MDP4_OVERLAYPROC0_BASE + 0x001c);
 }
 
 /*
@@ -135,14 +135,14 @@ void mdp4_blt_xy_update(struct mdp4_overlay_pipe *pipe)
  */
 void mdp4_dma_p_done_mddi(void)
 {
-       if (mddi_pipe->blt_end) {
-               mddi_pipe->blt_addr = 0;
-               mdp_intr_mask &= ~INTR_DMA_P_DONE;
-	       mdp_writel(mddi_pipe->mdp,mdp_intr_mask,MDP_INTR_ENABLE);
-               mdp4_overlayproc_cfg(mddi_pipe);
-               mdp4_overlay_dmap_xy(mddi_pipe);
-               return;
-       }
+	if (mddi_pipe->blt_end) {
+		mddi_pipe->blt_addr = 0;
+		mdp_intr_mask &= ~INTR_DMA_P_DONE;
+		mdp_writel(mddi_pipe->mdp, mdp_intr_mask, MDP_INTR_ENABLE);
+		mdp4_overlayproc_cfg(mddi_pipe);
+		mdp4_overlay_dmap_xy(mddi_pipe);
+		return;
+	}
 }
 /*
  * mdp4_overlay0_done_mddi: called from isr
@@ -160,20 +160,38 @@ void mdp4_overlay0_done_mddi(void)
 			mddi_pipe->blt_cnt++;
 
 			/* start DMAP */
-			mdp_writel(mddi_pipe->mdp,0x0,0x000c);
+			mdp_writel(mddi_pipe->mdp, 0x0, 0x000c);
 		}
 	}
 
 }
 #endif
 
+#ifdef CONFIG_MDP4_HW_VSYNC
+void mdp4_mddi_vsync_enable(struct mdp_info *mdp,
+		struct mdp4_overlay_pipe *pipe)
+{
+	uint32_t start_y, data;
+	int vsync_start_y_adjust = 4;
 
+	if (vsync_start_y_adjust <= pipe->dst_y)
+		start_y = pipe->dst_y - vsync_start_y_adjust;
+	else
+		start_y = (mdp->total_lcd_line - 1) -
+			(vsync_start_y_adjust - pipe->dst_y);
+
+	mdp_writel(mdp, start_y, 0x210);	/* primary */
+
+	data = mdp_readl(mdp, 0x20c);
+	data |= 1;
+	mdp_writel(mdp, data, 0x20c);
+}
+#endif
 
 void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t stride,
 			    uint32_t width, uint32_t height, uint32_t x,
 			    uint32_t y)
 {
-	//uint8_t *src;
 	int ptype;
 	uint32_t mddi_ld_param;
 	uint16_t mddi_vdo_packet_reg;
@@ -197,10 +215,10 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 
 		mddi_pipe = pipe; /* keep it */
 #ifdef CONFIG_FB_MSM_WRITE_BACK
-                init_completion(&mddi_comp);
-                mddi_pipe->blt_cnt = 0;
-                mddi_pipe->blt_end = 0;
-                mddi_pipe->blt_addr = blt_addr;
+		init_completion(&mddi_comp);
+		mddi_pipe->blt_cnt = 0;
+		mddi_pipe->blt_end = 0;
+		mddi_pipe->blt_addr = blt_addr;
 #endif
 
 		mddi_ld_param = 0;
@@ -208,11 +226,11 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 		mddi_vdo_packet_reg = MDDI_VDO_PACKET_PRIM;
 		if (mdp->hw_version >= MDP4_REVISION_V2_1) {
 			data = mdp_readl(mdp, MDP_AXI_RDMASTER_CONFIG);
-                        data &= ~0x0300;        /* bit 8, 9, MASTER4 */
-                        if (width == 540) /* qHD, 540x960 */
-                                data |= 0x0200;
-                        else
-                                data |= 0x0100;
+			data &= ~0x0300;        /* bit 8, 9, MASTER4 */
+			if (width == 540) /* qHD, 540x960 */
+				data |= 0x0200;
+			else
+				data |= 0x0100;
 
 			mdp_writel(mdp, data, MDP_AXI_RDMASTER_CONFIG);
 		}
@@ -229,13 +247,33 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 		}
 */
 		mdp_writel(mdp, mddi_ld_param, 0x00090);
-		if ( mdp->mdp_dev.color_format == MSM_MDP_OUT_IF_FMT_RGB888 )
+		if (mdp->mdp_dev.color_format == MSM_MDP_OUT_IF_FMT_RGB888)
 			mdp_writel(mdp, (MDDI_VDO_PACKET_DESC_RGB888 << 16) | mddi_vdo_packet_reg, 0x00094);
 		else
 			mdp_writel(mdp, (MDDI_VDO_PACKET_DESC_RGB565 << 16) | mddi_vdo_packet_reg, 0x00094);
 		mdp_writel(mdp, 0x01, 0x00098);
 	} else {
 		pipe = mddi_pipe;
+		if (mdp->hw_version >= MDP4_REVISION_V2_1 &&
+			mdp4_overlay_status_read(MDP4_OVERLAY_TYPE_UNSET)) {
+			data = mdp_readl(mdp, MDP_AXI_RDMASTER_CONFIG);
+			data &= ~0x0300;        /* bit 8, 9, MASTER4 */
+			if (width == 540) /* qHD, 540x960 */
+				data |= 0x0200;
+			else
+				data |= 0x0100;
+			mdp_writel(mdp, data, MDP_AXI_RDMASTER_CONFIG);
+			mdp4_overlay_status_write(MDP4_OVERLAY_TYPE_UNSET, false);
+		}
+		if (mdp->hw_version >= MDP4_REVISION_V2_1 &&
+			mdp4_overlay_status_read(MDP4_OVERLAY_TYPE_SET)) {
+			data = mdp_readl(mdp, MDP_AXI_RDMASTER_CONFIG);
+			if (data & 0x0300) {
+				data &= ~0x0300;		/* bit 8, 9, MASTER4 */
+				mdp_writel(mdp, data, MDP_AXI_RDMASTER_CONFIG);
+			}
+			mdp4_overlay_status_write(MDP4_OVERLAY_TYPE_SET, false);
+		}
 	}
 
 	pipe->src_height = height;
@@ -254,12 +292,11 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 	pipe->mixer_stage  = MDP4_MIXER_STAGE_BASE;
 
 	/* 16/32 bits framebuffer */
-	if (mddi_mdp->dma_config_dirty)
-	{
-		if(mddi_mdp->dma_format == DMA_IBUF_FORMAT_RGB565) {
+	if (mddi_mdp->dma_config_dirty) {
+		if (mddi_mdp->dma_format == DMA_IBUF_FORMAT_RGB565) {
 			pipe->src_format = MDP_RGB_565;
 			pipe->srcp0_ystride = pipe->src_width * 2;
-		} else if(mddi_mdp->dma_format == DMA_IBUF_FORMAT_XRGB8888) {
+		} else if (mddi_mdp->dma_format == DMA_IBUF_FORMAT_XRGB8888) {
 			pipe->src_format = MDP_RGBA_8888;
 			pipe->srcp0_ystride = pipe->src_width * 4;
 		}
@@ -276,6 +313,9 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 	mdp4_overlay_dmap_xy(pipe);
 
 	mdp4_overlay_dmap_cfg(pipe, 0);
+#ifdef CONFIG_MDP4_HW_VSYNC
+	mdp4_mddi_vsync_enable(mdp, pipe);
+#endif
 
 }
 
@@ -319,22 +359,21 @@ void mdp4_mddi_overlay(void *priv, uint32_t addr, uint32_t stride,
 			    uint32_t width, uint32_t height, uint32_t x,
 			    uint32_t y)
 {
-        struct mdp_info *mdp = priv;
+	struct mdp_info *mdp = priv;
 
 #ifdef CONFIG_FB_MSM_WRITE_BACK
 	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
 		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		mdp4_overlay_update_lcd(mdp, addr, stride, width, height, x, y);
 
-		if(mdp4_overlay_active(mdp, MDP4_MIXER0) > 1){
+		if (mdp4_overlay_active(mdp, MDP4_MIXER0) > 1) {
 			mdp4_overlay0_done_mddi();
 			mdp4_mddi_overlay_kickoff(mdp, mddi_pipe);
-		}
-		else {
-			if(mddi_pipe->blt_addr){
+		} else {
+			if (mddi_pipe->blt_addr) {
 				mdp4_overlay0_done_mddi();
 				mdp4_mddi_overlay_kickoff(mdp, mddi_pipe);
-			}else{
+			} else {
 				mdp4_dma_s_update_lcd(mdp);
 				mdp4_mddi_dma_s_kickoff(mdp, mddi_pipe);
 			}
@@ -348,7 +387,7 @@ void mdp4_mddi_overlay(void *priv, uint32_t addr, uint32_t stride,
 	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
 		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		mdp4_overlay_update_lcd(mdp, addr, stride, width, height, x, y);
-		if(mdp4_overlay_active(mdp, MDP4_MIXER0) > 1)
+		if (mdp4_overlay_active(mdp, MDP4_MIXER0) > 1)
 			mdp4_mddi_overlay_kickoff(mdp, mddi_pipe);
 		else {
 			mdp4_dma_s_update_lcd(mdp);

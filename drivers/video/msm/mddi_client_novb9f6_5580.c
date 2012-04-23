@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
@@ -21,6 +22,7 @@
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
 #include <mach/debug_display.h>
+#include <mach/panel_id.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(novtec_vsync_wait);
 
@@ -201,7 +203,9 @@ err_request_gpio_failed:
 
 static int mddi_novtec_probe(struct platform_device *pdev)
 {
+#ifndef CONFIG_MDP4_HW_VSYNC
 	int ret;
+#endif
 	struct msm_mddi_client_data *client_data = pdev->dev.platform_data;
 	struct msm_mddi_bridge_platform_data *bridge_data =
 		client_data->private_client_data;
@@ -213,7 +217,7 @@ static int mddi_novtec_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, panel);
 
-	PR_DISP_DEBUG( "%s\n", __func__);
+	PR_DISP_DEBUG("%s\n", __func__);
 
 	if (panel_data->caps & MSMFB_CAP_CABC) {
 		PR_DISP_INFO("CABC enabled\n");
@@ -221,12 +225,13 @@ static int mddi_novtec_probe(struct platform_device *pdev)
 		platform_device_register(&mddi_nov_cabc);
 	}
 
+#ifndef CONFIG_MDP4_HW_VSYNC
 	ret = setup_vsync(panel, 1);
 	if (ret) {
 		dev_err(&pdev->dev, "mddi_bridge_setup_vsync failed\n");
 		return ret;
 	}
-
+#endif
 	panel->client_data = client_data;
 	panel->panel_data.suspend = novtec_suspend;
 	panel->panel_data.resume = novtec_resume;
