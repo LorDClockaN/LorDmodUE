@@ -2635,7 +2635,15 @@ static int vision_init_panel(void)
         return ret;
 }
 
-
+#ifdef CONFIG_MDP4_HW_VSYNC
+static void vision_te_gpio_config(void)
+{
+	uint32_t te_gpio_table[] = {
+		PCOM_GPIO_CFG(30, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA),
+	};
+	config_gpio_table(te_gpio_table, ARRAY_SIZE(te_gpio_table));
+}
+#endif
 
 static void __init vision_init(void)
 {
@@ -2753,6 +2761,9 @@ static void __init vision_init(void)
 				&vision_properties_attr_group);
 	vision_audio_init();
 	vision_init_keypad();
+#ifdef CONFIG_MDP4_HW_VSYNC
+	vision_te_gpio_config();
+#endif
 	vision_wifi_init();
 }
 
