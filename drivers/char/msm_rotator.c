@@ -776,23 +776,6 @@ static int msm_rotator_rgb_types(struct msm_rotator_img_info *info,
 	return 0;
 }
 
-/*extern struct fb_info *registered_fb[];
-int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num)
-{
-	struct fb_info *info;
-
-	if (fb_num > FB_MAX)
-		return -1;
-
-	info = registered_fb[fb_num];
-	if (!info)
-		return -1;
-
-	*start = info->fix.smem_start;
-	*len = info->fix.smem_len;
-	return 0;
-}*/
-
 static int get_img(struct msmfb_data *fbd, unsigned long *start,
 	unsigned long *len, struct file **p_file, int *p_need,
 	struct ion_handle **p_ihdl)
