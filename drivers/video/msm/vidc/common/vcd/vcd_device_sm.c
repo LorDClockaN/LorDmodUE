@@ -42,14 +42,18 @@ void vcd_do_device_state_transition(struct vcd_drv_ctxt *drv_ctxt,
 		VCD_MSG_ERROR("Bad parameters. drv_ctxt=%p, to_state=%d",
 				  drv_ctxt, to_state);
 	}
+ 
+	if (!drv_ctxt)
+		return;
 
 	state_ctxt = &drv_ctxt->dev_state;
 
-	if (state_ctxt->state == to_state) {
-		VCD_MSG_HIGH("Device already in requested to_state=%d",
-				 to_state);
-
-		return;
+	if (state_ctxt->state) {
+		if (state_ctxt->state == to_state) {
+			VCD_MSG_HIGH("Device already in requested to_state=%d",
+					to_state);
+			return;
+		}
 	}
 
 	VCD_MSG_MED("vcd_do_device_state_transition: D%d -> D%d, for api %d",
@@ -920,8 +924,8 @@ static u32 vcd_set_dev_pwr_in_ready
 	switch (pwr_state) {
 	case VCD_PWR_STATE_SLEEP:
 		{
-			vcd_pause_all_sessions(dev_ctxt);
-
+			if (dev_ctxt->pwr_state == VCD_PWR_STATE_ON)
+				vcd_pause_all_sessions(dev_ctxt);
 			dev_ctxt->pwr_state = VCD_PWR_STATE_SLEEP;
 
 			break;

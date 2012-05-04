@@ -157,8 +157,8 @@ static int __devinit vidc_720p_probe(struct platform_device *pdev)
 		ERR("%s(): Invalid resource\n", __func__);
 		return -ENXIO;
 	}
-
-	vidc_device_p->phys_base = resource->start;
+	if (resource && resource->start)
+		vidc_device_p->phys_base = resource->start;
 	vidc_device_p->virt_base = ioremap(resource->start,
 	resource->end - resource->start + 1);
 

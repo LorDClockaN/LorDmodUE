@@ -1558,14 +1558,18 @@ void vcd_do_client_state_transition(struct vcd_clnt_ctxt *cctxt,
 		VCD_MSG_ERROR("Bad parameters. cctxt=%p, to_state=%d",
 			      cctxt, to_state);
 	}
+ 
+	if (!cctxt)
+		return;
 
 	state_ctxt = &cctxt->clnt_state;
 
-	if (state_ctxt->state == to_state) {
-		VCD_MSG_HIGH("Client already in requested to_state=%d",
-			     to_state);
-
-		return;
+	if (state_ctxt->state) {
+		if (state_ctxt->state == to_state) {
+			VCD_MSG_HIGH("Client already in requested to_state=%d",
+					to_state);
+			return;
+		}
 	}
 
 	VCD_MSG_MED("vcd_do_client_state_transition: C%d -> C%d, for api %d",
