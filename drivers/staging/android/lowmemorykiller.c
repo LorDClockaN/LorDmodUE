@@ -35,8 +35,6 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
-#include <linux/memory.h>
-#include <linux/memory_hotplug.h>
 
 #define DEBUG_LEVEL_DEATHPENDING 6
 
@@ -56,17 +54,6 @@ static size_t lowmem_minfree[6] = {
 };
 static int lowmem_minfree_size = 4;
 
-static size_t fork_boost_adj[6] = {
-	0,
-	2,
-	4,
-	7,
-	9,
-	12
-};
-
-static unsigned int offlining;
-
 static size_t lowmem_minfile[6] = {
 	1536,
 	2048,
@@ -80,35 +67,24 @@ static int lowmem_minfile_size = 6;
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
 static uint32_t lowmem_check_filepages = 0;
-static unsigned long lowmem_fork_boost_timeout;
-/*
- * discount = 1 -> 1/2^1 = 50% Off
- * discount = 2 -> 1/2^2 = 25% Off
- * discount = 3 -> 1/2^3 = 12.5% Off
- * discount = 4 -> 1/2^4 = 6.25% Off
- */
-static unsigned int discount = 2;
-static unsigned long boost_duration = (HZ << 1);
-
-static uint32_t lowmem_fork_boost = 1;
 
 #define lowmem_print(level, x...)			\
 	do {						\
 		if (lowmem_debug_level >= (level)) {	\
-			printk(KERN_INFO "lowmem: ");		\
+			printk("lowmem: ");		\
 			printk(x);			\
 		}					\
 	} while (0)
 
 static int
-task_free_notify_func(struct notifier_block *self, unsigned long val, void *data);
+task_notify_func(struct notifier_block *self, unsigned long val, void *data);
 
-static struct notifier_block task_free_nb = {
-	.notifier_call	= task_free_notify_func,
+static struct notifier_block task_nb = {
+	.notifier_call	= task_notify_func,
 };
 
 static int
-task_free_notify_func(struct notifier_block *self, unsigned long val, void *data)
+task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
 
@@ -117,21 +93,6 @@ task_free_notify_func(struct notifier_block *self, unsigned long val, void *data
 		lowmem_print(2, "deathpending end %d (%s)\n",
 			task->pid, task->comm);
 	}
-
-	return NOTIFY_OK;
-}
-
-static int
-task_fork_notify_func(struct notifier_block *self, unsigned long val, void *data);
-
-static struct notifier_block task_fork_nb = {
-	.notifier_call	= task_fork_notify_func,
-};
-
-static int
-task_fork_notify_func(struct notifier_block *self, unsigned long val, void *data)
-{
-	lowmem_fork_boost_timeout = jiffies + boost_duration;
 
 	return NOTIFY_OK;
 }
@@ -172,33 +133,7 @@ static void dump_deathpending(struct task_struct *t_deathpending)
 	read_unlock(&tasklist_lock);
 }
 
-#ifdef CONFIG_MEMORY_HOTPLUG
-static int lmk_hotplug_callback(struct notifier_block *self,
-				unsigned long cmd, void *data)
-{
-	switch (cmd) {
-	/* Don't care LMK cases */
-	case MEM_ONLINE:
-	case MEM_OFFLINE:
-	case MEM_CANCEL_ONLINE:
-	case MEM_CANCEL_OFFLINE:
-	case MEM_GOING_ONLINE:
-		offlining = 0;
-		lowmem_print(4, "lmk in normal mode\n");
-		break;
-	/* LMK should account for movable zone */
-	case MEM_GOING_OFFLINE:
-		offlining = 1;
-		lowmem_print(4, "lmk in hotplug mode\n");
-		break;
-	}
-	return NOTIFY_DONE;
-}
-#endif
-
-
-
-static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
+static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 {
 	struct task_struct *p;
 	struct task_struct *selected = NULL;
@@ -214,22 +149,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 						global_page_state(NR_SHMEM);
 	int lru_file = global_page_state(NR_ACTIVE_FILE) +
 			global_page_state(NR_INACTIVE_FILE);
-	struct zone *zone;
-	int fork_boost;
-	int *adj_array;
 
-	if (offlining) {
-		/* Discount all free space in the section being offlined */
-		for_each_zone(zone) {
-			 if (zone_idx(zone) == ZONE_MOVABLE) {
-				other_free -= zone_page_state(zone,
-						NR_FREE_PAGES);
-				lowmem_print(4, "lowmem_shrink discounted "
-					"%lu pages in movable zone\n",
-					zone_page_state(zone, NR_FREE_PAGES));
-			}
-		}
-	}
 	/*
 	 * If we already have a death outstanding, then
 	 * bail out right away; indicating to vmscan
@@ -243,21 +163,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		return 0;
 	}
 
-	if (lowmem_fork_boost &&
-	    time_before_eq(jiffies, lowmem_fork_boost_timeout)) {
-		fork_boost = lowmem_minfree[lowmem_minfree_size - 1] >> discount;
-		if (unlikely(other_file < fork_boost))
-			other_file = 0;
-		else
-			other_file -= fork_boost;
-
-		adj_array = fork_boost_adj;
-		lowmem_print(3, "lowmem_shrink other_file: %d, fork_boost: %d\n",
-			     other_file, fork_boost);
-	}
-	else
-		adj_array = lowmem_adj;
-
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
@@ -268,22 +173,22 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 				(lowmem_check_filepages &&
 				(lru_file < lowmem_minfile[i]))) {
 
-				min_adj = adj_array[i];
+				min_adj = lowmem_adj[i];
 				break;
 			}
 		}
 	}
-	if (sc->nr_to_scan > 0)
-		lowmem_print(3, "lowmem_shrink %lu, %x, ofree %d %d, ma %d\n",
-			     sc->nr_to_scan, sc->gfp_mask, other_free, other_file,
+	if (nr_to_scan > 0)
+		lowmem_print(3, "lowmem_shrink %d, %x, ofree %d %d, ma %d\n",
+			     nr_to_scan, gfp_mask, other_free, other_file,
 			     min_adj);
 	rem = global_page_state(NR_ACTIVE_ANON) +
 		global_page_state(NR_ACTIVE_FILE) +
 		global_page_state(NR_INACTIVE_ANON) +
 		global_page_state(NR_INACTIVE_FILE);
-	if (sc->nr_to_scan <= 0 || min_adj == OOM_ADJUST_MAX + 1) {
-		lowmem_print(5, "lowmem_shrink %lu, %x, return %d\n",
-			     sc->nr_to_scan, sc->gfp_mask, rem);
+	if (nr_to_scan <= 0 || min_adj == OOM_ADJUST_MAX + 1) {
+		lowmem_print(5, "lowmem_shrink %d, %x, return %d\n",
+			     nr_to_scan, gfp_mask, rem);
 		return rem;
 	}
 	selected_oom_adj = min_adj;
@@ -332,8 +237,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		force_sig(SIGKILL, selected);
 		rem -= selected_tasksize;
 	}
-	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
-		     sc->nr_to_scan, sc->gfp_mask, rem);
+	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
+		     nr_to_scan, gfp_mask, rem);
 	read_unlock(&tasklist_lock);
 	return rem;
 }
@@ -345,20 +250,15 @@ static struct shrinker lowmem_shrinker = {
 
 static int __init lowmem_init(void)
 {
-	task_free_register(&task_free_nb);
-	task_fork_register(&task_fork_nb);
+	task_free_register(&task_nb);
 	register_shrinker(&lowmem_shrinker);
-#ifdef CONFIG_MEMORY_HOTPLUG
-	hotplug_memory_notifier(lmk_hotplug_callback, 0);
-#endif
 	return 0;
 }
 
 static void __exit lowmem_exit(void)
 {
 	unregister_shrinker(&lowmem_shrinker);
-	task_fork_unregister(&task_fork_nb);
-	task_free_unregister(&task_free_nb);
+	task_free_unregister(&task_nb);
 }
 
 module_param_named(cost, lowmem_shrinker.seeks, int, S_IRUGO | S_IWUSR);
@@ -367,7 +267,6 @@ module_param_array_named(adj, lowmem_adj, int, &lowmem_adj_size,
 module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 			 S_IRUGO | S_IWUSR);
 module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
-module_param_named(fork_boost, lowmem_fork_boost, uint, S_IRUGO | S_IWUSR);
 
 module_param_named(check_filepages , lowmem_check_filepages, uint,
 		   S_IRUGO | S_IWUSR);
