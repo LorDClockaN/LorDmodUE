@@ -151,6 +151,7 @@ struct kgsl_device_platform_data {
 	int num_levels;
 	int (*set_grp_async)(void);
 	unsigned int idle_timeout;
+	bool strtstp_sleepwake;
 	unsigned int nap_allowed;
 	struct kgsl_grp_clk_name clk;
 	struct kgsl_grp_clk_name imem_clk_name;
