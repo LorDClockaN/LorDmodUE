@@ -76,6 +76,12 @@ static struct android_pmem_platform_data pmem_adsp_pdata = {
 #endif
 };
 
+static struct android_pmem_platform_data pmem_audio_pdata = {
+	.name = "pmem_audio",
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
+
 static struct android_pmem_platform_data pmem_camera_pdata = {
 	.name = "pmem_camera",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
@@ -92,6 +98,12 @@ static struct platform_device pmem_adsp_device = {
 	.name = "android_pmem",
 	.id = 1,
 	.dev = { .platform_data = &pmem_adsp_pdata },
+};
+
+static struct platform_device pmem_audio_device = {
+	.name = "android_pmem",
+	.id = 5,
+	.dev = { .platform_data = &pmem_audio_pdata },
 };
 
 static struct platform_device pmem_camera_device = {
@@ -250,6 +262,12 @@ void __init msm_add_mem_devices(struct msm_pmem_setting *setting)
 		pmem_adsp_pdata.start = setting->pmem_adsp_start;
 		pmem_adsp_pdata.size = setting->pmem_adsp_size;
 		platform_device_register(&pmem_adsp_device);
+	}
+
+	if (setting->pmem_audio_size) {
+		pmem_audio_pdata.start = setting->pmem_audio_start;
+		pmem_audio_pdata.size = setting->pmem_audio_size;
+		platform_device_register(&pmem_audio_device);
 	}
 
 	if (setting->pmem_camera_size) {
