@@ -558,17 +558,20 @@ static void audlpa_async_send_data(struct audio *audio, unsigned needed,
 			temp = audio->bytecount_head;
 			used_buf = list_first_entry(&audio->out_queue,
 					struct audlpa_buffer_node, list);
-			if ((audio->bytecount_head + used_buf->buf.data_len) <
-				audio->bytecount_consumed) {
-				audio->bytecount_head += used_buf->buf.data_len;
+
+			if (audio->device_switch !=
+				DEVICE_SWITCH_STATE_COMPLETE) {
+				audio->bytecount_head +=
+						used_buf->buf.data_len;
 				temp = audio->bytecount_head;
 				list_del(&used_buf->list);
 				evt_payload.aio_buf = used_buf->buf;
-				audlpa_post_event(audio, AUDIO_EVENT_WRITE_DONE,
+				audlpa_post_event(audio,
+						AUDIO_EVENT_WRITE_DONE,
 						  evt_payload);
 				kfree(used_buf);
+				audio->drv_status &= ~ADRV_STATUS_OBUF_GIVEN;
 			}
-			audio->drv_status &= ~ADRV_STATUS_OBUF_GIVEN;
 		}
 	}
 	if (audio->out_needed) {
