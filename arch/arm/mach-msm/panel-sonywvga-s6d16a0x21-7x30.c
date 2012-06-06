@@ -422,7 +422,15 @@ static struct platform_device sonywvga_lcdc_device = {
 };
 
 static struct msm_mdp_platform_data mdp_pdata = {
-        .color_format = MSM_MDP_OUT_IF_FMT_RGB666,
+	.overrides = 0,
+	.color_format = MSM_MDP_OUT_IF_FMT_RGB666,
+#ifdef CONFIG_MDP4_HW_VSYNC
+	.xres = 480,
+	.yres = 800,
+	.back_porch = 20,
+	.front_porch = 20,
+	.pulse_width = 40,
+#endif
 };
 
 void sonywvga_brightness_set(struct led_classdev *led_cdev,
