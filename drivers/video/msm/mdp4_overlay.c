@@ -1637,45 +1637,25 @@ static int mdp4_pull_mode(struct mdp4_overlay_pipe *pipe)
 		lcdc = mdp_readl(pipe->mdp, 0xd0000);
 		lcdc &= 0x01;
 	} else {           /* LCDC */
-		lcdc = mdp_readl(pipe->mdp, 0xc0000);
-		lcdc &= 0x01;
+		lcdc = mdp_readl(pipe->mdp, 0x0038);
+		lcdc &= 0x08;
 	}
 	return lcdc;
 }
 
-#ifdef CONFIG_MACH_PRIMOTD
+#ifdef CONFIG_MACH_VISION
 /* Temporary workaround before QCT release formal fix. */
 int mdp4_overlay_alter_req(struct mdp_overlay *req)
 {
-
-	/*1280*720 portrait play*/
-	if (req->src.format == MDP_Y_CRCB_H2V2_TILE &&
-		(req->src.width == 1280 ||
-			req->src.height == 720)
-		) {
-		if (req->dst_rect.w == 480) {
-			if (req->dst_rect.h >= 320 ||
-			(req->dst_rect.h >= 180 &&
-			req->user_data[0] == 0)) {
-			/*1280*720 fix fullscreen cut*/
-			pr_info("%s: reject alter req  of 720p.", __func__);
-			req->src_rect.x = 30;
-			req->src_rect.w = 1180;
-
-		} else {
-			pr_info("%s: alter req due to down-scaling issue of 720p.",__func__);
-			req->src_rect.x = 30;
-			req->src_rect.w = 1180;
-		}
-	} else if (req->dst_rect.h == 135 && req->dst_rect.w == 240) {
-	/*720*1280 video trim */
-		pr_info("%s: alter req due to down-scaling issue of 720p(trim).",
-		__func__);
+	if (req->src.format == MDP_Y_CRCB_H2V2 &&
+			req->src.width == 1280 && req->src.height == 720 &&
+			req->dst_rect.w == 480) {
+		pr_info("%s: alter req due to down-scaling issue of 720p.",
+				__func__);
 		req->src_rect.x = 60;
 		req->src_rect.y = 90;
-		req->src_rect.w = 800;
-		req->src_rect.h = 480;
-		}
+		req->src_rect.w = 960;
+		req->src_rect.h = 540;
 	}
 	return 0;
 }
@@ -1699,7 +1679,7 @@ int mdp4_overlay_set(struct mdp_device *mdp_dev, struct fb_info *info, struct md
 	mdp4_dump_ov(req);
 #endif
 
-#ifdef CONFIG_MACH_PRIMOTD
+#ifdef CONFIG_MACH_VISION
 	mdp4_overlay_alter_req(req);
 #endif
 
