@@ -69,8 +69,6 @@ do { \
 } while (0)
 #define BITS_PER_PIXEL(info) (info->fb->var.bits_per_pixel)
 #define BYTES_PER_PIXEL(info) (info->fb->var.bits_per_pixel >> 3)
-int msmfb_overlay_enable = 1;
-int first_overlay_set = 0;
 static int msmfb_debug_mask;
 module_param_named(msmfb_debug_mask, msmfb_debug_mask, int,
 		   S_IRUGO | S_IWUSR | S_IWGRP);
@@ -778,11 +776,6 @@ static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 	if (copy_from_user(&req, p, sizeof(req)))
 		return -EFAULT;
 
-	if (msmfb_overlay_enable == 0 && !first_overlay_set)
-		return 0;
-	if (first_overlay_set > 0)
-		first_overlay_set--;
-
 	PR_DISP_INFO("%s(%d) dst rect info w=%d h=%d x=%d y=%d rotator=%d\n", __func__, __LINE__, req.dst_rect.w, req.dst_rect.h, req.dst_rect.x, req.dst_rect.y, req.user_data[0]);
 
 	sem_owned = overlay_semaphore_lock();
@@ -1382,10 +1375,6 @@ static int msmfb_probe(struct platform_device *pdev)
 		register_onchg_suspend(&msmfb->onchg_earlier_suspend);
 	}
 #endif
-#endif
-
-#ifdef CONFIG_FB_MSM_OVERLAY
-	msmfb_overlay_enable = 1;
 #endif
 
 #if MSMFB_DEBUG
