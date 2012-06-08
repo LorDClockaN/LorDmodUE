@@ -161,6 +161,11 @@
 #define MIPI_IMASK_DL2_FIFO_OVERFLOW          (0x00000001<<30)
 #define MIPI_IMASK_DL3_FIFO_OVERFLOW          (0x00000001<<31)
 
+/* AXI rates in KHz */
+#define MSM_AXI_QOS_PREVIEW     192000
+#define MSM_AXI_QOS_SNAPSHOT    192000
+#define MSM_AXI_QOS_RECORDING   192000
+
 static struct clk *camio_vfe_mdc_clk;
 static struct clk *camio_mdc_clk;
 static struct clk *camio_vfe_clk;
@@ -175,6 +180,10 @@ static struct msm_camera_io_ext camio_ext;
 
 static struct resource *camifpadio, *csiio;
 void __iomem *camifpadbase, *csibase;
+
+static uint8_t csi_irq_debug = false;
+static uint8_t csi_irq_debug_cnt = 0;
+#define  csi_irq_debug_max_cnt 200
 
 void msm_io_w(u32 data, void __iomem *addr)
 {
@@ -744,6 +753,14 @@ int msm_camio_read_camif_status(void)
 {
 	return msm_io_r(camifpadbase + 0x4);
 }
+
+void msm_camio_disable_csi_log(void)
+{
+	pr_info("[CAM] msm_camio_disable_csi_log");
+	csi_irq_debug = false;
+	csi_irq_debug_cnt = 0;
+}
+
 int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 {
 	int rc = 0;
@@ -835,4 +852,29 @@ int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 	msm_io_w(0xFFF7F3FF, csibase + MIPI_INTERRUPT_STATUS);
 
 	return rc;
+}
+
+void msm_camio_set_perf_lvl(enum msm_bus_perf_setting perf_setting)
+{
+	switch (perf_setting) {
+	case S_INIT:
+		add_axi_qos();
+	case S_PREVIEW:
+		update_axi_qos(MSM_AXI_QOS_PREVIEW);
+		break;
+	case S_VIDEO:
+		update_axi_qos(MSM_AXI_QOS_RECORDING);
+		break;
+	case S_CAPTURE:
+		update_axi_qos(MSM_AXI_QOS_SNAPSHOT);
+		break;
+	case S_DEFAULT:
+		update_axi_qos(-1);
+		break;
+	case S_EXIT:
+		release_axi_qos();
+		break;
+	default:
+		CDBG("%s: INVALID CASE\n", __func__);
+	}
 }

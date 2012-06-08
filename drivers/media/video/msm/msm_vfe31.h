@@ -281,6 +281,10 @@ enum  VFE_STATE {
 #define V31_DUMMY_10              103
 #define V31_SYNC_TIMER_SETTING    104
 #define V31_ASYNC_TIMER_SETTING   105
+#ifdef CONFIG_CAMERA_MULTISHOT
+#define V31_MULTISHOT             106
+#endif
+
 #define V31_CAMIF_OFF             0x000001E4
 #define V31_CAMIF_LEN             32
 

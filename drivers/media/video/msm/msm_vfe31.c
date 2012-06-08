@@ -84,6 +84,9 @@ static void  *vfe_syncdata;
 static struct clk *ebi1_clk;
 static const char *const clk_name = "ebi1_clk";
 
+static uint8_t vfe_sof_irq_debug_cnt = 0;
+#define  vfe_sof_irq_debug_max_cnt 200
+
 struct vfe31_isr_queue_cmd {
 	struct list_head list;
 	uint32_t                           vfeInterruptStatus0;
@@ -219,6 +222,9 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 		{V31_DUMMY_10},
 		{V31_SYNC_TIMER_SETTING},
 /*105*/	{V31_ASYNC_TIMER_SETTING},
+#ifdef CONFIG_CAMERA_MULTISHOT
+		{V31_MULTISHOT, V31_CAPTURE_LEN, 0xFF},
+#endif
 };
 
 static void vfe_addr_convert(struct msm_vfe_phy_info *pinfo,
@@ -489,7 +495,9 @@ static void vfe31_release(struct platform_device *pdev)
 
 	msm_camio_disable(pdev);
 	/* release AXI frequency request */
-	release_axi_qos();
+	pr_info("[CAM] %s, release_axi_qos\n", __func__);
+	msm_camio_set_perf_lvl(S_EXIT);
+	usleep(1000);
 	vfe_syncdata = NULL;
 
 	if (sinfo->csi_if) {
@@ -890,25 +898,89 @@ static int vfe31_stop_recording(void){
 	return 0;
 }
 
+#ifdef CONFIG_CAMERA_MULTISHOT
+static int vfe31_multishot(void)
+{
+	uint32_t irq_comp_mask = 0;
+	uint32_t temp;
+	/* capture command is valid for both idle and active state. */
+	irq_comp_mask	=
+		msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+
+	pr_info("[CAM] %s: vfe31_ctrl->operation_mode %d %d", __func__,
+		vfe31_ctrl->operation_mode, vfe31_ctrl->outpath.output_mode);
+
+	if ((vfe31_ctrl->operation_mode == VFE_MODE_OF_OPERATION_MULTISHOT)) {
+		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_PT) {
+			irq_comp_mask |=
+			(0x1 << (vfe31_ctrl->outpath.out0.ch0 + 8) |
+			0x1 << (vfe31_ctrl->outpath.out0.ch1 + 8));
+		}
+		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_S) {
+			irq_comp_mask |=
+			(0x1 << (vfe31_ctrl->outpath.out1.ch0 + 8) |
+			0x1 << (vfe31_ctrl->outpath.out1.ch1 + 8));
+		}
+		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_PT) {
+			msm_io_w(1, vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
+				24 * (vfe31_ctrl->outpath.out0.ch0));
+			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
+				20 + 24 * (vfe31_ctrl->outpath.out0.ch0));
+			msm_io_w(1, vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
+				24 * (vfe31_ctrl->outpath.out0.ch1));
+			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
+				 20 + 24 * (vfe31_ctrl->outpath.out0.ch1));
+		}
+		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_S) {
+			msm_io_w(1, vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
+				24 * (vfe31_ctrl->outpath.out1.ch0));
+			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
+				20 + 24 * (vfe31_ctrl->outpath.out1.ch0));
+			msm_io_w(1, vfe31_ctrl->vfebase + V31_AXI_OUT_OFF + 20 +
+				24 * (vfe31_ctrl->outpath.out1.ch1));
+			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
+				20 + 24 * (vfe31_ctrl->outpath.out1.ch1));
+		}
+	}
+	msm_io_w(irq_comp_mask, vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+	msm_camio_set_perf_lvl(S_CAPTURE);
+	usleep(1000);
+	vfe31_start_common();
+	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+	/* for debug */
+	msm_io_w(1, vfe31_ctrl->vfebase + 0x18C);
+	msm_io_w(1, vfe31_ctrl->vfebase + 0x188);
+	return 0;
+}
+#endif
 
 static int vfe31_capture(uint32_t num_frames_capture)
 {
 	uint32_t irq_comp_mask = 0;
 	uint32_t temp;
 	/* capture command is valid for both idle and active state. */
+#ifndef CONFIG_CAMERA_MULTISHOT
 	vfe31_ctrl->outpath.out1.capture_cnt = num_frames_capture;
 	if (vfe31_ctrl->operation_mode == 1) {
 		vfe31_ctrl->outpath.out0.capture_cnt =
 			num_frames_capture;
 	}
+#endif
 	vfe31_ctrl->vfe_capture_count = num_frames_capture;
 	irq_comp_mask	=
 		msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 
 	if (vfe31_ctrl->operation_mode == 1) {
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_PT) {
+#ifdef CONFIG_CAMERA_MULTISHOT
+			irq_comp_mask |=
+			(0x1 << (vfe31_ctrl->outpath.out0.ch0 + 8) |
+			0x1 << (vfe31_ctrl->outpath.out0.ch1 + 8));
+#else
 			irq_comp_mask |= (0x1 << vfe31_ctrl->outpath.out0.ch0 |
 					0x1 << vfe31_ctrl->outpath.out0.ch1);
+#endif
 		}
 		if (vfe31_ctrl->outpath.output_mode & VFE31_OUTPUT_MODE_S) {
 			irq_comp_mask |=
@@ -948,6 +1020,8 @@ static int vfe31_capture(uint32_t num_frames_capture)
 	}
 	msm_io_w(irq_comp_mask, vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
+	msm_camio_set_perf_lvl(S_CAPTURE);
+	usleep(1000);
 	vfe31_start_common();
 	msm_io_r(vfe31_ctrl->vfebase + VFE_IRQ_COMP_MASK);
 	/* for debug */
@@ -990,6 +1064,8 @@ static int vfe31_start(void)
 			24 * (vfe31_ctrl->outpath.out0.ch1));
 	}
 
+	msm_camio_set_perf_lvl(S_PREVIEW);
+	usleep(1000);
 	vfe31_start_common();
 	return 0;
 }
@@ -1143,6 +1219,12 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 	case V31_UPDATE:
 		vfe31_update();
 		break;
+#ifdef CONFIG_CAMERA_MULTISHOT
+	case V31_MULTISHOT:
+		pr_info("[CAM] V31_MULTISHOT\n");
+		vfe31_multishot();
+		break;
+#endif
 	case V31_CAPTURE:
 		rc = vfe31_capture(1);
 		/* rc = vfe31_capture(2); */	/* For skip first frame */
@@ -1735,6 +1817,9 @@ static int vfe31_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 	}
 		break;
 
+#ifdef CONFIG_CAMERA_MULTISHOT
+	case CMD_AXI_CFG_MULTISHOT:
+#endif
 	case CMD_AXI_CFG_SNAP: {
 		struct axidata *axid;
 		uint32_t *axio = NULL;
@@ -1812,6 +1897,12 @@ static inline void vfe31_read_irq_status(struct vfe31_irq_status *out)
 	to the command register using the barrier */
 	msm_io_w_mb(1, vfe31_ctrl->vfebase + VFE_IRQ_CMD);
 
+}
+
+static void vfe31_disable_irq_debug_msg(void)
+{
+	msm_camio_disable_csi_log();
+	vfe_sof_irq_debug_cnt = 0;
 }
 
 static void vfe31_send_msg_no_payload(enum VFE31_MESSAGE_ID id)
@@ -1893,8 +1984,11 @@ static void vfe31_process_reg_update_irq(void)
                                vfe31_ctrl->vfebase + VFE_MODULE_CFG);
 */
 		/*CDBG("stop video triggered .\n");*/
+		pr_info("[CAM] stop video triggered .\n");
 	}
 	if (vfe31_ctrl->start_ack_pending == TRUE) {
+		pr_info("[CAM] irq startAckIrq\n");
+		vfe31_disable_irq_debug_msg();
 		vfe31_send_msg_no_payload(MSG_ID_START_ACK);
 		vfe31_ctrl->start_ack_pending = FALSE;
 	} else {
@@ -2065,6 +2159,8 @@ static void vfe31_process_camif_sof_irq(void)
 	uint32_t  temp;
 	if (vfe31_ctrl->operation_mode == 3) {  /* in raw snapshot mode */
 		if (vfe31_ctrl->start_ack_pending) {
+			pr_info("[CAM] irq startAckIrq\n");
+			vfe31_disable_irq_debug_msg();
 			vfe31_send_msg_no_payload(MSG_ID_START_ACK);
 			vfe31_ctrl->start_ack_pending = FALSE;
 		}
@@ -2249,7 +2345,200 @@ static void vfe31_process_output_path_irq_0(void)
 			CDBG("path_irq_0 - no free buffer!\n");
 		}
 	}
+#ifndef CONFIG_CAMERA_MULTISHOT
+static void vfe31_process_snapshot_frame(void)
+{
+	uint32_t ping_pong;
+	uint32_t pyaddr, pcbcraddr;
 
+	ping_pong = msm_io_r(vfe31_ctrl->vfebase +
+		VFE_BUS_PING_PONG_STATUS);
+
+	/* Y channel */
+	pyaddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch0);
+	/* Chroma channel */
+	pcbcraddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch1);
+
+	pr_info("[CAM] snapshot main, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		pyaddr, pcbcraddr);
+	if (vfe31_ctrl->outpath.out1.free_buf.available) {
+		/* Y channel */
+		vfe31_put_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch0,
+		vfe31_ctrl->outpath.out1.free_buf.paddr +
+		vfe31_ctrl->outpath.out1.free_buf.y_off);
+		/* Chroma channel */
+		vfe31_put_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch1,
+		vfe31_ctrl->outpath.out1.free_buf.paddr +
+		vfe31_ctrl->outpath.out1.free_buf.cbcr_off);
+		vfe31_ctrl->outpath.out1.free_buf.available = 0;
+	}
+	if (vfe31_ctrl->operation_mode & 1)
+		vfe31_ctrl->outpath.out1.capture_cnt--;
+}
+#else
+static void vfe31_process_snapshot_frame(void)
+{
+	uint32_t ping_pong;
+	uint32_t pyaddr, pcbcraddr;
+
+	ping_pong = msm_io_r(vfe31_ctrl->vfebase +
+		VFE_BUS_PING_PONG_STATUS);
+
+	/* Y channel- Main Image */
+	pyaddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch0);
+	/* Chroma channel - Main Image */
+	pcbcraddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch1);
+
+	pr_info("[CAM] %s: snapshot main, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		__func__, pyaddr, pcbcraddr);
+	if (vfe31_ctrl->outpath.out1.free_buf.available) {
+		/* Y channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out1.ch0,
+			vfe31_ctrl->outpath.out1.free_buf.paddr +
+			vfe31_ctrl->outpath.out1.free_buf.y_off);
+		/* Chroma channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out1.ch1,
+			vfe31_ctrl->outpath.out1.free_buf.paddr +
+			vfe31_ctrl->outpath.out1.free_buf.cbcr_off);
+		vfe31_ctrl->outpath.out1.free_buf.available = 0;
+	}
+	 vfe_send_outmsg(MSG_ID_OUTPUT_S, pyaddr, pcbcraddr);
+
+	/* Y channel- TN Image */
+	pyaddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out0.ch0);
+	/* Chroma channel - TN Image */
+	pcbcraddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out0.ch1);
+
+	pr_info("[CAM] %s: snapshot TN, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		__func__, pyaddr, pcbcraddr);
+	if (vfe31_ctrl->outpath.out0.free_buf.available) {
+		/* Y channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out0.ch0,
+			vfe31_ctrl->outpath.out0.free_buf.paddr +
+			vfe31_ctrl->outpath.out0.free_buf.y_off);
+		/* Chroma channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out0.ch1,
+			vfe31_ctrl->outpath.out0.free_buf.paddr +
+			vfe31_ctrl->outpath.out0.free_buf.cbcr_off);
+		vfe31_ctrl->outpath.out0.free_buf.available = 0;
+	}
+
+	vfe_send_outmsg(MSG_ID_OUTPUT_T, pyaddr, pcbcraddr);
+
+	if (vfe31_ctrl->operation_mode & 1) {
+		/* in snapshot mode if done then send
+			snapshot done message */
+		if (vfe31_ctrl->vfe_capture_count == 0) {
+			pr_info("[CAM] send SNAPSHOT_DONE\n");
+			vfe31_send_msg_no_payload(MSG_ID_SNAPSHOT_DONE);
+			/* Ensure the write order while writing
+				to the cmd register using barrier */
+			msm_io_w_mb(CAMIF_COMMAND_STOP_IMMEDIATELY,
+				vfe31_ctrl->vfebase +
+				VFE_CAMIF_COMMAND);
+		}
+	}
+}
+#endif
+
+#ifdef CONFIG_CAMERA_MULTISHOT
+static void vfe31_process_multishot_frame(void)
+{
+	uint32_t ping_pong;
+	uint32_t pyaddr, pcbcraddr;
+
+	ping_pong = msm_io_r(vfe31_ctrl->vfebase +
+		VFE_BUS_PING_PONG_STATUS);
+
+	/* Y channel- Main Image */
+	pyaddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch0);
+	/* Chroma channel - Main Image */
+	pcbcraddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out1.ch1);
+
+	CDBG("[CAM] %s: snapshot main, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		__func__, pyaddr, pcbcraddr);
+	if (vfe31_ctrl->outpath.out1.free_buf.available) {
+		/* Y channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out1.ch0,
+			vfe31_ctrl->outpath.out1.free_buf.paddr +
+			vfe31_ctrl->outpath.out1.free_buf.y_off);
+		/* Chroma channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out1.ch1,
+			vfe31_ctrl->outpath.out1.free_buf.paddr +
+			vfe31_ctrl->outpath.out1.free_buf.cbcr_off);
+		vfe31_ctrl->outpath.out1.free_buf.available = 0;
+	}
+	 vfe_send_outmsg(MSG_ID_OUTPUT_S, pyaddr, pcbcraddr);
+
+	/* Y channel- TN Image */
+	pyaddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out0.ch0);
+	/* Chroma channel - TN Image */
+	pcbcraddr = vfe31_get_ch_addr(ping_pong,
+		vfe31_ctrl->outpath.out0.ch1);
+
+	CDBG("[CAM] %s: snapshot TN, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
+		__func__, pyaddr, pcbcraddr);
+	if (vfe31_ctrl->outpath.out0.free_buf.available) {
+		/* Y channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out0.ch0,
+			vfe31_ctrl->outpath.out0.free_buf.paddr +
+			vfe31_ctrl->outpath.out0.free_buf.y_off);
+		/* Chroma channel */
+		vfe31_put_ch_addr(ping_pong,
+			vfe31_ctrl->outpath.out0.ch1,
+			vfe31_ctrl->outpath.out0.free_buf.paddr +
+			vfe31_ctrl->outpath.out0.free_buf.cbcr_off);
+		vfe31_ctrl->outpath.out0.free_buf.available = 0;
+	}
+
+	vfe_send_outmsg(MSG_ID_OUTPUT_T, pyaddr, pcbcraddr);
+}
+#endif
+
+static void vfe31_process_output_path_irq_1(void)
+{
+	CDBG("[CAM] vfe31_process_output_path_irq_1, vfe_capture_count %d out1.free_buf.available %d\n",
+				vfe31_ctrl->vfe_capture_count, vfe31_ctrl->outpath.out1.free_buf.available);
+
+	if ((vfe31_ctrl->operation_mode & 1)
+		&& ((vfe31_ctrl->vfe_capture_count <= 1)
+		|| vfe31_ctrl->outpath.out1.free_buf.available)) {
+		/* snapshot or rawsnapshot */
+		vfe31_process_snapshot_frame();
+	}
+#ifdef CONFIG_CAMERA_MULTISHOT
+    else if ((VFE_MODE_OF_OPERATION_MULTISHOT == vfe31_ctrl->operation_mode)
+		&& (vfe31_ctrl->outpath.out0.free_buf.available
+		&& vfe31_ctrl->outpath.out1.free_buf.available)) {
+		/* multishot */
+		vfe31_process_multishot_frame();
+	}
+#endif
+    else {
+		vfe31_ctrl->outpath.out1.frame_drop_cnt++;
+		pr_info("[CAM] path_irq_1 - no free buffer!\n");
+	}
+}
+
+#if 0
 static void vfe31_process_output_path_irq_1(void)
 {
 	uint32_t ping_pong;
@@ -2301,6 +2590,7 @@ static void vfe31_process_output_path_irq_1(void)
 			CDBG("path_irq_1 - no free buffer!\n");
 	}
 }
+#endif
 
 static void vfe31_process_output_path_irq_2(void)
 {
@@ -2569,6 +2859,7 @@ static void vfe31_do_tasklet(unsigned long data)
 			/*CDBG("Image composite done 2 irq occured.\n");*/
 			vfe31_process_output_path_irq_2();
 		}
+#ifndef CONFIG_CAMERA_MULTISHOT
 		/* in snapshot mode if done then send snapshot done message */
 		if (vfe31_ctrl->operation_mode & 1) {
 			if ((vfe31_ctrl->outpath.out0.capture_cnt == 0) &&
@@ -2580,6 +2871,7 @@ static void vfe31_do_tasklet(unsigned long data)
 				vfe31_ctrl->vfebase + VFE_CAMIF_COMMAND);
 			}
 		}
+#endif
 		/* then process stats irq. */
 		if (vfe31_ctrl->stats_comp) {
 			/* process stats comb interrupt. */
@@ -2617,6 +2909,11 @@ static void vfe31_do_tasklet(unsigned long data)
 	}
 	if (qcmd->vfeInterruptStatus0 & VFE_IRQ_STATUS0_CAMIF_SOF_MASK) {
 		/*CDBG("irq	camifSofIrq\n");*/
+		if (vfe31_ctrl->start_ack_pending &&
+			(vfe_sof_irq_debug_cnt < vfe_sof_irq_debug_max_cnt)) {
+			vfe_sof_irq_debug_cnt++;
+			pr_info("[CAM] irq camifSofIrq, count %d\n", vfe_sof_irq_debug_cnt);
+		}
 		vfe31_process_camif_sof_irq();
 	}
 	kfree(qcmd);
@@ -2801,6 +3098,9 @@ static int vfe31_init(struct msm_vfe_callback *presp,
 	rc = msm_camio_enable(dev);
 	if (rc < 0)
 		pr_err("[CAM]msm_camio_enable error\n");
+
+		msm_camio_set_perf_lvl(S_INIT);
+		usleep(1000);
 
         if (msm_vpe_open() < 0)
                 CDBG("%s: vpe_open failed\n", __func__);

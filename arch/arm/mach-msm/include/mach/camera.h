@@ -34,6 +34,15 @@
 #define NUM_AF_STAT_OUTPUT_BUFFERS      3
 #define max_control_command_size 150
 
+enum VFE_ModeOfOperation{
+  VFE_MODE_OF_OPERATION_CONTINUOUS,
+  VFE_MODE_OF_OPERATION_SNAPSHOT,
+  VFE_MODE_OF_OPERATION_VIDEO,
+  VFE_MODE_OF_OPERATION_RAW_SNAPSHOT,
+  VFE_MODE_OF_OPERATION_MULTISHOT,
+  VFE_LAST_MODE_OF_OPERATION_ENUM
+};
+
 enum msm_queue {
 	MSM_CAM_Q_CTRL,     /* control command or control command status */
 	MSM_CAM_Q_VFE_EVT,  /* adsp event */
@@ -252,6 +261,11 @@ struct msm_sync {
 	 */
 	struct msm_device_queue frame_q;
 	int unblock_poll_frame;
+	int unblock_poll_pic_frame;
+	atomic_t send_output_s;
+
+	atomic_t num_drop_output_s; /* num of snapshot frames to drop */
+	atomic_t has_dropped_output_s; /* whether the latest snapshot frame was dropped or not. */
 
 	/* This queue contains snapshot frames.  It is accessed by the DSP (in
 	 * interrupt context, and by the control thread.
@@ -448,6 +462,18 @@ enum msm_s_setting {
 	S_RES_CAPTURE
 };
 
+enum msm_bus_perf_setting {
+	S_INIT,
+	S_PREVIEW,
+	S_VIDEO,
+	S_CAPTURE,
+	S_ZSL,
+	S_STEREO_VIDEO,
+	S_STEREO_CAPTURE,
+	S_DEFAULT,
+	S_EXIT
+};
+
 int msm_camio_enable(struct platform_device *dev);
 
 int  msm_camio_clk_enable(enum msm_camio_clk_type clk);
@@ -497,5 +523,7 @@ u32 msm_io_r(void __iomem *addr);
 u32 msm_io_r_mb(void __iomem *addr);
 void msm_io_dump(void __iomem *addr, int size);
 void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len);
+void msm_camio_set_perf_lvl(enum msm_bus_perf_setting);
 
+void msm_camio_disable_csi_log(void);
 #endif

@@ -44,6 +44,13 @@ config CAMERA_ZSL
 	---help---
 	  Enable support for ZSL
 
+config CAMERA_MULTISHOT
+       bool "Qualcomm MSM Multishot support"
+       depends on MSM_CAMERA && ARCH_MSM7X30
+       default n
+       ---help---
+         Enable support for Multishot
+
 config MSM_CAMERA_DEBUG
 	bool "Qualcomm MSM camera debugging with printk"
 	depends on MSM_CAMERA
