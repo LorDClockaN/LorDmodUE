@@ -32,6 +32,7 @@
 #include <linux/memcontrol.h>
 #include <linux/frontswap.h>
 #include <linux/swapfile.h>
+#include <linux/oom.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -1568,6 +1569,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	struct address_space *mapping;
 	struct inode *inode;
 	char *pathname;
+	int oom_score_adj;
 	int i, type, prev;
 	int err;
 
@@ -1629,6 +1631,10 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	current->flags |= PF_OOM_ORIGIN;
 	err = try_to_unuse(type, false, 0);
 	current->flags &= ~PF_OOM_ORIGIN;
+
+	oom_score_adj = test_set_oom_score_adj(OOM_SCORE_ADJ_MAX);
+	err = try_to_unuse(type);
+	test_set_oom_score_adj(oom_score_adj);
 
 	if (err) {
 		/* re-insert swap space back into swap_list */
