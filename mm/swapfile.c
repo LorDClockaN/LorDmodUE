@@ -1633,7 +1633,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	current->flags &= ~PF_OOM_ORIGIN;
 
 	oom_score_adj = test_set_oom_score_adj(OOM_SCORE_ADJ_MAX);
-	err = try_to_unuse(type);
+	err = try_to_unuse(type, false, 0);
 	test_set_oom_score_adj(oom_score_adj);
 
 	if (err) {
