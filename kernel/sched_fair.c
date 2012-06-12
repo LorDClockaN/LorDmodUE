@@ -91,7 +91,7 @@ unsigned int sysctl_sched_child_runs_first __read_mostly;
 #ifdef CONFIG_KERNELIZER
 unsigned int __read_mostly sysctl_sched_compat_yield = 1;
 #else
-unsigned int __read_mostly sysctl_sched_compat_yield;
+unsigned int __read_mostly sysctl_sched_compat_yield = 1;
 #endif
 
 /*
