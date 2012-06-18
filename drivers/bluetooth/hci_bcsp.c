@@ -739,7 +739,7 @@ static struct hci_uart_proto bcsp = {
 	.flush		= bcsp_flush
 };
 
-int __init bcsp_init(void)
+int bcsp_init(void)
 {
 	int err = hci_uart_register_proto(&bcsp);
 
@@ -751,7 +751,7 @@ int __init bcsp_init(void)
 	return err;
 }
 
-int __exit bcsp_deinit(void)
+int bcsp_deinit(void)
 {
 	return hci_uart_unregister_proto(&bcsp);
 }

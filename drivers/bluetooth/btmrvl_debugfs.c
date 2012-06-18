@@ -64,8 +64,6 @@ static ssize_t btmrvl_hscfgcmd_write(struct file *file,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 10, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.hscfgcmd = result;
 
@@ -94,7 +92,6 @@ static const struct file_operations btmrvl_hscfgcmd_fops = {
 	.read	= btmrvl_hscfgcmd_read,
 	.write	= btmrvl_hscfgcmd_write,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_psmode_write(struct file *file, const char __user *ubuf,
@@ -110,8 +107,6 @@ static ssize_t btmrvl_psmode_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 10, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.psmode = result;
 
@@ -135,7 +130,6 @@ static const struct file_operations btmrvl_psmode_fops = {
 	.read	= btmrvl_psmode_read,
 	.write	= btmrvl_psmode_write,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_pscmd_write(struct file *file, const char __user *ubuf,
@@ -151,8 +145,6 @@ static ssize_t btmrvl_pscmd_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 10, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.pscmd = result;
 
@@ -181,7 +173,6 @@ static const struct file_operations btmrvl_pscmd_fops = {
 	.read = btmrvl_pscmd_read,
 	.write = btmrvl_pscmd_write,
 	.open = btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_gpiogap_write(struct file *file, const char __user *ubuf,
@@ -197,8 +188,6 @@ static ssize_t btmrvl_gpiogap_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 16, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.gpio_gap = result;
 
@@ -222,13 +211,12 @@ static const struct file_operations btmrvl_gpiogap_fops = {
 	.read	= btmrvl_gpiogap_read,
 	.write	= btmrvl_gpiogap_write,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_hscmd_write(struct file *file, const char __user *ubuf,
 						size_t count, loff_t *ppos)
 {
-	struct btmrvl_private *priv = file->private_data;
+	struct btmrvl_private *priv = (struct btmrvl_private *) file->private_data;
 	char buf[16];
 	long result, ret;
 
@@ -238,8 +226,6 @@ static ssize_t btmrvl_hscmd_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 10, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.hscmd = result;
 	if (priv->btmrvl_dev.hscmd) {
@@ -266,7 +252,6 @@ static const struct file_operations btmrvl_hscmd_fops = {
 	.read	= btmrvl_hscmd_read,
 	.write	= btmrvl_hscmd_write,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_hsmode_write(struct file *file, const char __user *ubuf,
@@ -282,8 +267,6 @@ static ssize_t btmrvl_hsmode_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	ret = strict_strtol(buf, 10, &result);
-	if (ret)
-		return ret;
 
 	priv->btmrvl_dev.hsmode = result;
 
@@ -306,7 +289,6 @@ static const struct file_operations btmrvl_hsmode_fops = {
 	.read	= btmrvl_hsmode_read,
 	.write	= btmrvl_hsmode_write,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_curpsmode_read(struct file *file, char __user *userbuf,
@@ -324,7 +306,6 @@ static ssize_t btmrvl_curpsmode_read(struct file *file, char __user *userbuf,
 static const struct file_operations btmrvl_curpsmode_fops = {
 	.read	= btmrvl_curpsmode_read,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_psstate_read(struct file *file, char __user * userbuf,
@@ -342,7 +323,6 @@ static ssize_t btmrvl_psstate_read(struct file *file, char __user * userbuf,
 static const struct file_operations btmrvl_psstate_fops = {
 	.read	= btmrvl_psstate_read,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_hsstate_read(struct file *file, char __user *userbuf,
@@ -360,7 +340,6 @@ static ssize_t btmrvl_hsstate_read(struct file *file, char __user *userbuf,
 static const struct file_operations btmrvl_hsstate_fops = {
 	.read	= btmrvl_hsstate_read,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 static ssize_t btmrvl_txdnldready_read(struct file *file, char __user *userbuf,
@@ -379,7 +358,6 @@ static ssize_t btmrvl_txdnldready_read(struct file *file, char __user *userbuf,
 static const struct file_operations btmrvl_txdnldready_fops = {
 	.read	= btmrvl_txdnldready_read,
 	.open	= btmrvl_open_generic,
-	.llseek = default_llseek,
 };
 
 void btmrvl_debugfs_init(struct hci_dev *hdev)

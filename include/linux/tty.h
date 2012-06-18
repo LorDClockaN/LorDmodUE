@@ -254,7 +254,6 @@ struct tty_operations;
 struct tty_struct {
 	int	magic;
 	struct kref kref;
-        struct device *dev;
 	struct tty_driver *driver;
 	const struct tty_operations *ops;
 	int index;

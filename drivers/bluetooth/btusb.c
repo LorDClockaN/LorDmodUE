@@ -102,19 +102,6 @@ static struct usb_device_id blacklist_table[] = {
 	/* Broadcom BCM2033 without firmware */
 	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = BTUSB_IGNORE },
 
-	/* Atheros 3011 with sflash firmware */
-	{ USB_DEVICE(0x0cf3, 0x3002), .driver_info = BTUSB_IGNORE },
-	{ USB_DEVICE(0x13d3, 0x3304), .driver_info = BTUSB_IGNORE },
-
-	/* Atheros AR9285 Malbec with sflash firmware */
-	{ USB_DEVICE(0x03f0, 0x311d), .driver_info = BTUSB_IGNORE },
-
-	/* Atheros 3012 with sflash firmware */
-	{ USB_DEVICE(0x0cf3, 0x3004), .driver_info = BTUSB_IGNORE },
-
-	/* Atheros AR5BBU12 with sflash firmware */
-	{ USB_DEVICE(0x0489, 0xe02c), .driver_info = BTUSB_IGNORE },
-
 	/* Broadcom BCM2035 */
 	{ USB_DEVICE(0x0a5c, 0x2035), .driver_info = BTUSB_WRONG_SCO_MTU },
 	{ USB_DEVICE(0x0a5c, 0x200a), .driver_info = BTUSB_WRONG_SCO_MTU },
@@ -174,7 +161,6 @@ static struct usb_device_id blacklist_table[] = {
 #define BTUSB_BULK_RUNNING	1
 #define BTUSB_ISOC_RUNNING	2
 #define BTUSB_SUSPENDING	3
-#define BTUSB_DID_ISO_RESUME	4
 
 struct btusb_data {
 	struct hci_dev       *hdev;
@@ -208,6 +194,7 @@ struct btusb_data {
 	unsigned int sco_num;
 	int isoc_altsetting;
 	int suspend_count;
+	int did_iso_resume:1;
 };
 
 static int inc_tx(struct btusb_data *data)
@@ -255,8 +242,7 @@ static void btusb_intr_complete(struct urb *urb)
 
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err < 0) {
-		if (err != -EPERM)
-			BT_ERR("%s urb %p failed to resubmit (%d)",
+		BT_ERR("%s urb %p failed to resubmit (%d)",
 						hdev->name, urb, -err);
 		usb_unanchor_urb(urb);
 	}
@@ -340,8 +326,7 @@ static void btusb_bulk_complete(struct urb *urb)
 
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err < 0) {
-		if (err != -EPERM)
-			BT_ERR("%s urb %p failed to resubmit (%d)",
+		BT_ERR("%s urb %p failed to resubmit (%d)",
 						hdev->name, urb, -err);
 		usb_unanchor_urb(urb);
 	}
@@ -430,14 +415,13 @@ static void btusb_isoc_complete(struct urb *urb)
 
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err < 0) {
-		if (err != -EPERM)
-			BT_ERR("%s urb %p failed to resubmit (%d)",
+		BT_ERR("%s urb %p failed to resubmit (%d)",
 						hdev->name, urb, -err);
 		usb_unanchor_urb(urb);
 	}
 }
 
-static inline void __fill_isoc_descriptor(struct urb *urb, int len, int mtu)
+static void inline __fill_isoc_descriptor(struct urb *urb, int len, int mtu)
 {
 	int i, offset = 0;
 
@@ -694,8 +678,7 @@ static int btusb_send_frame(struct sk_buff *skb)
 		break;
 
 	case HCI_ACLDATA_PKT:
-		if (!data->bulk_tx_ep || (hdev->conn_hash.acl_num < 1 &&
-						hdev->conn_hash.le_num < 1))
+		if (!data->bulk_tx_ep || hdev->conn_hash.acl_num < 1)
 			return -ENODEV;
 
 		urb = usb_alloc_urb(0, GFP_ATOMIC);
@@ -722,11 +705,15 @@ static int btusb_send_frame(struct sk_buff *skb)
 		pipe = usb_sndisocpipe(data->udev,
 					data->isoc_tx_ep->bEndpointAddress);
 
-		usb_fill_int_urb(urb, data->udev, pipe,
-				skb->data, skb->len, btusb_isoc_tx_complete,
-				skb, data->isoc_tx_ep->bInterval);
+		urb->dev      = data->udev;
+		urb->pipe     = pipe;
+		urb->context  = skb;
+		urb->complete = btusb_isoc_tx_complete;
+		urb->interval = data->isoc_tx_ep->bInterval;
 
 		urb->transfer_flags  = URB_ISO_ASAP;
+		urb->transfer_buffer = skb->data;
+		urb->transfer_buffer_length = skb->len;
 
 		__fill_isoc_descriptor(urb, skb->len,
 				le16_to_cpu(data->isoc_tx_ep->wMaxPacketSize));
@@ -785,7 +772,7 @@ static void btusb_notify(struct hci_dev *hdev, unsigned int evt)
 	}
 }
 
-static inline int __set_isoc_interface(struct hci_dev *hdev, int altsetting)
+static int inline __set_isoc_interface(struct hci_dev *hdev, int altsetting)
 {
 	struct btusb_data *data = hdev->driver_data;
 	struct usb_interface *intf = data->isoc;
@@ -835,15 +822,15 @@ static void btusb_work(struct work_struct *work)
 	int err;
 
 	if (hdev->conn_hash.sco_num > 0) {
-		if (!test_bit(BTUSB_DID_ISO_RESUME, &data->flags)) {
-			err = usb_autopm_get_interface(data->isoc ? data->isoc : data->intf);
+		if (!data->did_iso_resume) {
+			err = usb_autopm_get_interface(data->isoc);
 			if (err < 0) {
 				clear_bit(BTUSB_ISOC_RUNNING, &data->flags);
 				usb_kill_anchored_urbs(&data->isoc_anchor);
 				return;
 			}
 
-			set_bit(BTUSB_DID_ISO_RESUME, &data->flags);
+			data->did_iso_resume = 1;
 		}
 		if (data->isoc_altsetting != 2) {
 			clear_bit(BTUSB_ISOC_RUNNING, &data->flags);
@@ -864,8 +851,10 @@ static void btusb_work(struct work_struct *work)
 		usb_kill_anchored_urbs(&data->isoc_anchor);
 
 		__set_isoc_interface(hdev, 0);
-		if (test_and_clear_bit(BTUSB_DID_ISO_RESUME, &data->flags))
-			usb_autopm_put_interface(data->isoc ? data->isoc : data->intf);
+		if (data->did_iso_resume) {
+			data->did_iso_resume = 0;
+			usb_autopm_put_interface(data->isoc);
+		}
 	}
 }
 
