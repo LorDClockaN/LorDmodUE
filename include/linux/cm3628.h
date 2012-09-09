@@ -91,12 +91,13 @@
 
 extern unsigned int ps_kparam1;
 extern unsigned int ps_kparam2;
-
+extern unsigned int als_kadc;
 struct cm3628_platform_data {
 	int intr;
 	uint16_t levels[10];
 	uint16_t golden_adc;
 	int (*power)(int, uint8_t); /* power to the chip */
+	int (*re_power)(uint8_t); /* power to the chip */
 	uint8_t ALS_IT;
 	uint8_t ALS_PERS;
 	uint8_t ALS_AV;
