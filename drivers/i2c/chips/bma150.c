@@ -184,7 +184,7 @@ static int bma_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int bma_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long bma_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 
@@ -475,7 +475,13 @@ static struct file_operations bma_fops = {
 	.owner = THIS_MODULE,
 	.open = bma_open,
 	.release = bma_release,
-	.ioctl = bma_ioctl,
+	/*.ioctl = bma_ioctl,*/
+#if HAVE_COMPAT_IOCTL
+	.compat_ioctl = bma_ioctl,
+#endif
+#if HAVE_UNLOCKED_IOCTL
+	.unlocked_ioctl = bma_ioctl,
+#endif
 };
 
 static struct miscdevice bma_device = {
@@ -594,4 +600,3 @@ module_exit(bma150_exit);
 
 MODULE_DESCRIPTION("BMA150 G-sensor driver");
 MODULE_LICENSE("GPL");
-
