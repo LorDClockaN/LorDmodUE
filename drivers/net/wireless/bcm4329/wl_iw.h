@@ -66,15 +66,15 @@ typedef struct wl_iw_extra_params {
 	int 	target_channel;
 } wl_iw_extra_params_t;
 
-#define	WL_IW_RSSI_MINVAL	-200
-#define	WL_IW_RSSI_NO_SIGNAL	-91
-#define	WL_IW_RSSI_VERY_LOW	-80
-#define	WL_IW_RSSI_LOW		-70
-#define	WL_IW_RSSI_GOOD		-68
-#define	WL_IW_RSSI_VERY_GOOD	-58
-#define	WL_IW_RSSI_EXCELLENT	-57
-#define	WL_IW_RSSI_INVALID	 0
-#define MAX_WX_STRING		80
+#define WL_IW_RSSI_MINVAL       -200
+#define WL_IW_RSSI_NO_SIGNAL    -98
+#define WL_IW_RSSI_VERY_LOW     -87
+#define WL_IW_RSSI_LOW          -77
+#define WL_IW_RSSI_GOOD         -75
+#define WL_IW_RSSI_VERY_GOOD    -65
+#define WL_IW_RSSI_EXCELLENT    -64
+#define WL_IW_RSSI_INVALID       0
+#define MAX_WX_STRING            87
 #define isprint(c)		bcm_isprint(c)
 #define WL_IW_SET_ACTIVE_SCAN	(SIOCIWFIRSTPRIV+1)
 #define WL_IW_GET_RSSI		(SIOCIWFIRSTPRIV+3)
